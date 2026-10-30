@@ -10,6 +10,9 @@ extends Resource
 ## lines up with the screen centre while aiming down sights).
 @export var model: PackedScene
 
+## One-handed weapons can be wielded in pairs (akimbo); the rest need both hands.
+@export var one_handed := false
+
 @export_group("Firing")
 @export var fire_cooldown := 0.35
 ## Multiplies the fire sound's pitch so weapons sound distinct.

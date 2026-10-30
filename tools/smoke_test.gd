@@ -67,11 +67,11 @@ func _run() -> void:
 	await _frames(5)
 	Input.action_press(&"aim")
 	await _frames(2)
-	var mag_before := _weapons.in_mag
+	var mag_before := _weapons.primary.in_mag
 	Input.action_press(&"fire")
 	await _frames(3)
 	Input.action_release(&"fire")
-	_check("ammo decremented", _weapons.in_mag == mag_before - 1)
+	_check("ammo decremented", _weapons.primary.in_mag == mag_before - 1)
 	_check("target hit while aiming", _hits >= 1)
 	Input.action_release(&"aim")
 	await create_timer(0.6).timeout
@@ -81,7 +81,7 @@ func _run() -> void:
 	Input.action_press(&"aim")
 	await create_timer(0.7).timeout
 	_check("aiming", _weapons.is_aiming())
-	_check_near("ads fov", _player.camera.fov, _weapons.definition.ads_fov, 0.1)
+	_check_near("ads fov", _player.camera.fov, _weapons.primary.definition.ads_fov, 0.1)
 	var sight := _player.camera.get_node("WeaponHolder").get_child(0).find_child("Sight", true, false) as Node3D
 	var sight_local := _player.camera.to_local(sight.global_position)
 	_check_near("sight centred horizontally", sight_local.x, 0.0, 0.002)
@@ -96,8 +96,8 @@ func _run() -> void:
 	Input.action_release(&"reload")
 	_check("reloading", _weapons.is_reloading())
 	await _frames(90)
-	_check("reload finished", not _weapons.is_reloading() and _weapons.in_mag == _weapons.definition.magazine_size)
-	_check("reserve reduced by one round", _weapons.reserve == _weapons.definition.reserve_ammo - 1)
+	_check("reload finished", not _weapons.is_reloading() and _weapons.primary.in_mag == _weapons.primary.definition.magazine_size)
+	_check("reserve reduced by one round", _weapons.primary.reserve == _weapons.primary.definition.reserve_ammo - 1)
 
 	# Pickup from a spawner that only offers shotguns at (10, 0.04, -12).
 	_player.teleport(Vector3(10, 0, -11), 0.0)
@@ -105,7 +105,7 @@ func _run() -> void:
 	Input.action_press(&"interact")
 	await _frames(2)
 	Input.action_release(&"interact")
-	_check("picked up shotgun", _weapons.definition.id == &"shotgun")
+	_check("picked up shotgun", _weapons.primary.definition.id == &"shotgun")
 	await _frames(5)
 	var dropped := _main.get_children().filter(func(n: Node) -> bool: return n is DroppedWeapon)
 	_check("old weapon was dropped", dropped.size() == 1)
@@ -118,11 +118,128 @@ func _run() -> void:
 	Input.action_press(&"interact")
 	await _frames(2)
 	Input.action_release(&"interact")
-	_check("picked dropped pistol back up", _weapons.definition.id == &"pistol")
-	_check("dropped pistol kept its ammo", _weapons.in_mag == 8 and _weapons.reserve == 23)
+	_check("picked dropped pistol back up", _weapons.primary.definition.id == &"pistol")
+	_check("dropped pistol kept its ammo", _weapons.primary.in_mag == 8 and _weapons.primary.reserve == 23)
+
+	await _test_akimbo()
 
 	print("smoke test: %s" % ("OK" if _failures == 0 else "%d FAILED" % _failures))
 	quit(1 if _failures > 0 else 0)
+
+
+## Akimbo: pairing one-handed weapons, per-hand firing, F/G replacement, two-handed pickups.
+func _test_akimbo() -> void:
+	var pistol: WeaponDefinition = load("res://resources/weapons/pistol.tres")
+	var smg: WeaponDefinition = load("res://resources/weapons/smg.tres")
+	var shotgun: WeaponDefinition = load("res://resources/weapons/shotgun.tres")
+	_player.teleport(Vector3(0, 0, 8), 0.0)
+	await _frames(5)
+	_check("holding a lone pistol", _weapons.primary.definition == pistol and not _weapons.is_akimbo())
+	var dropped_before := _dropped_count()
+
+	_spawn_dropped(smg, 10, 20)
+	await _frames(20)
+	await _press(&"interact")
+	_check("F adds a second one-handed weapon", _weapons.is_akimbo() and _weapons.secondary.definition == smg)
+	_check("secondary keeps its ammo", _weapons.secondary.in_mag == 10 and _weapons.secondary.reserve == 20)
+	_check("nothing dropped when pairing", _dropped_count() == dropped_before)
+	_check("left viewmodel shown", _player.camera.get_node("WeaponHolderLeft").get_child_count() == 1)
+
+	# No aiming while akimbo; each button shoots its own hand.
+	Input.action_press(&"aim")
+	await create_timer(0.4).timeout
+	_check("no ADS while akimbo", not _weapons.is_aiming())
+	_check_near("fov stays at hip", _player.camera.fov, 75.0, 0.1)
+	var primary_mag := _weapons.primary.in_mag
+	Input.action_release(&"aim")
+	await _frames(2)
+	Input.action_press(&"fire_secondary")
+	await _frames(3)
+	Input.action_release(&"fire_secondary")
+	_check("RMB fires the secondary only", _weapons.secondary.in_mag < 10 and _weapons.primary.in_mag == primary_mag)
+	var secondary_mag := _weapons.secondary.in_mag
+	await create_timer(0.3).timeout
+	Input.action_press(&"fire")
+	await _frames(3)
+	Input.action_release(&"fire")
+	_check("LMB fires the primary only", _weapons.primary.in_mag == primary_mag - 1 and _weapons.secondary.in_mag == secondary_mag)
+
+	# Reload: left first then right, skipping full weapons, no firing meanwhile.
+	await create_timer(0.3).timeout
+	var left_before := _weapons.secondary.in_mag
+	await _press(&"reload")
+	_check("left reloads first", _weapons.secondary.is_reloading() and not _weapons.primary.is_reloading())
+	Input.action_press(&"fire")
+	await _frames(3)
+	Input.action_release(&"fire")
+	_check("cannot fire while a weapon reloads", _weapons.primary.in_mag == primary_mag - 1)
+	await create_timer(smg.reload_duration).timeout
+	_check("then right reloads", _weapons.secondary.in_mag == smg.magazine_size and _weapons.primary.is_reloading())
+	await create_timer(pistol.reload_duration + 0.2).timeout
+	_check("both reloaded", not _weapons.is_reloading() and _weapons.primary.in_mag == pistol.magazine_size)
+	await _press(&"reload")
+	_check("nothing to reload when both full", not _weapons.is_reloading())
+	Input.action_press(&"fire")
+	await _frames(3)
+	Input.action_release(&"fire")
+	primary_mag = _weapons.primary.in_mag + 1
+	await _press(&"reload")
+	_check("only the non-full weapon reloads", _weapons.primary.is_reloading() and not _weapons.secondary.is_reloading())
+	await create_timer(pistol.reload_duration + 0.2).timeout
+	secondary_mag = _weapons.secondary.in_mag
+	primary_mag = _weapons.primary.in_mag + 1
+
+	# F replaces the secondary, G the primary.
+	_spawn_dropped(pistol, 5, 6)
+	await _frames(20)
+	await _press(&"interact")
+	_check("F replaces the secondary", _weapons.secondary.definition == pistol and _weapons.secondary.in_mag == 5)
+	_check("primary untouched by F", _weapons.primary.definition == pistol and _weapons.primary.in_mag == primary_mag - 1)
+	_check("replaced secondary was dropped", _dropped_count() == dropped_before + 1)
+
+	_spawn_dropped(smg, 3, 4)
+	await _frames(20)
+	await _press(&"interact_alt")
+	_check("G replaces the primary", _weapons.primary.definition == smg and _weapons.primary.in_mag == 3)
+	_check("secondary untouched by G", _weapons.secondary.definition == pistol and _weapons.secondary.in_mag == 5)
+	_check("replaced primary was dropped", _dropped_count() == dropped_before + 2)
+
+	# A two-handed weapon takes the place of everything held.
+	_spawn_dropped(shotgun, 2, 7)
+	await _frames(20)
+	await _press(&"interact")
+	_check("two-handed pickup is alone in the primary", _weapons.primary.definition == shotgun and not _weapons.is_akimbo())
+	_check("both held weapons were dropped", _dropped_count() == dropped_before + 4)
+	_check("left viewmodel removed", _player.camera.get_node("WeaponHolderLeft").get_child_count() == 0)
+
+	# One-handed over a two-handed primary replaces it instead of pairing.
+	_spawn_dropped(pistol, 4, 4)
+	await _frames(20)
+	await _press(&"interact")
+	_check("one-handed replaces a two-handed primary", _weapons.primary.definition == pistol and not _weapons.is_akimbo())
+	# G with a lone one-handed weapon swaps it rather than pairing.
+	_spawn_dropped(smg, 9, 9)
+	await _frames(20)
+	await _press(&"interact_alt")
+	_check("G swaps a lone primary", _weapons.primary.definition == smg and not _weapons.is_akimbo())
+
+
+func _press(action: StringName) -> void:
+	Input.action_press(action)
+	await _frames(2)
+	Input.action_release(action)
+	await _frames(2)
+
+
+func _spawn_dropped(definition: WeaponDefinition, mag: int, spare: int) -> void:
+	var dropped := (load("res://scenes/weapons/dropped_weapon.tscn") as PackedScene).instantiate() as DroppedWeapon
+	dropped.setup(definition, mag, spare)
+	_main.add_child(dropped)
+	dropped.global_position = _player.global_position + Vector3(0, 0.3, 0)
+
+
+func _dropped_count() -> int:
+	return _main.get_children().filter(func(n: Node) -> bool: return n is DroppedWeapon).size()
 
 
 func _frames(count: int) -> void:

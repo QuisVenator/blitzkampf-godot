@@ -1,17 +1,28 @@
 class_name WeaponManager
 extends Node
-## Owns the player's held weapon: firing, spread, ammo, reload, pickup and
+## Owns the player's held weapons: firing, spread, ammo, reload, pickup and
 ## dropping. Everything else (HUD, audio, viewmodel) listens to its signals.
+##
+## There are two slots, primary (right hand) and secondary (left hand). One-handed
+## weapons can fill both (akimbo). With two weapons the sights are unavailable:
+## LMB (`fire`) shoots the primary and RMB (`fire_secondary`) the secondary. That
+## button scheme is a deliberate default that may become configurable later; the
+## two roles are separate Input Map actions so rebinding needs no code change.
+## Two-handed weapons always occupy the primary slot alone.
 
-signal weapon_changed(definition: WeaponDefinition)
-signal ammo_changed(in_mag: int, reserve: int)
-signal reloading_changed(reloading: bool)
+## `definition` is null when the slot has just been emptied.
+signal weapon_changed(slot: int, definition: WeaponDefinition)
+signal ammo_changed(slot: int, in_mag: int, reserve: int)
+signal reloading_changed(slot: int, reloading: bool)
 signal spread_changed(degrees: float)
 signal aiming_changed(aiming: bool)
 signal fired(definition: WeaponDefinition)
 signal reload_started(definition: WeaponDefinition)
 signal hit_confirmed
 signal picked_up
+
+const PRIMARY := 0
+const SECONDARY := 1
 
 const MAX_RANGE := 100.0
 ## Horizontal speed (m/s) above which hip-fire uses the "moving" spread.
@@ -27,6 +38,8 @@ const RECOIL_RECOVERY_TIME := 0.2
 
 const THROW_ORIGIN_HEIGHT := 1.1
 const THROW_FORWARD_OFFSET := 0.3
+## Sideways offset per hand so two weapons dropped together don't overlap.
+const THROW_SIDE_OFFSET := 0.12
 const THROW_FORWARD_SPEED := 3.2
 const THROW_UP_SPEED := 2.6
 const THROW_MAX_TUMBLE := 4.5
@@ -34,58 +47,76 @@ const THROW_MAX_TUMBLE := 4.5
 @export var starting_weapon: WeaponDefinition
 @export var dropped_weapon_scene: PackedScene
 
-var definition: WeaponDefinition
-var in_mag := 0
-var reserve := 0
+var primary: WeaponSlot
+var secondary: WeaponSlot
 
-var _cooldown := 0.0
-var _reload_left := 0.0
-var _spread_deg := -1.0
-var _viewmodel: Node3D
-var _recoil_tween: Tween
+var _slots: Array[WeaponSlot] = []
+## Slots waiting for the reload in progress to finish (left hand goes first).
+var _reload_queue: Array[int] = []
+var _crosshair_spread_deg := -1.0
 var _aiming := false
 var _pose_tween: Tween
-var _hip_position := Vector3.ZERO
-var _hip_yaw := 0.0
 var _hip_fov := 75.0
 
 @onready var _player: Player = get_parent()
 @onready var _camera: Camera3D = $"../Head/Camera3D"
-@onready var _holder: Node3D = $"../Head/Camera3D/WeaponHolder"
 @onready var _effects: ShotEffects = $ShotEffects
 
 
 func _ready() -> void:
-	_hip_position = _holder.position
-	_hip_yaw = _holder.rotation.y
 	_hip_fov = _camera.fov
-	equip(starting_weapon)
+	primary = WeaponSlot.new($"../Head/Camera3D/WeaponHolder")
+	secondary = WeaponSlot.new($"../Head/Camera3D/WeaponHolderLeft")
+	_slots = [primary, secondary]
+	equip(PRIMARY, starting_weapon)
 
 
+## True while any weapon is reloading or waiting to; firing is blocked meanwhile.
 func is_reloading() -> bool:
-	return _reload_left > 0.0
+	return primary.is_reloading() or secondary.is_reloading() or not _reload_queue.is_empty()
 
 
 func is_aiming() -> bool:
 	return _aiming
 
 
+func is_akimbo() -> bool:
+	return not secondary.is_empty()
+
+
+## The crosshair spread: the widest cone of the weapons held.
 func current_spread_deg() -> float:
-	return _spread_deg
+	return _crosshair_spread_deg
 
 
-## Equips `new_definition`. Omit the ammo to get a fresh, fully stocked weapon.
-func equip(new_definition: WeaponDefinition, mag := -1, spare := -1) -> void:
-	definition = new_definition
-	in_mag = new_definition.magazine_size if mag < 0 else mag
-	reserve = new_definition.reserve_ammo if spare < 0 else spare
-	_cooldown = 0.0
-	_reload_left = 0.0
-	_rebuild_viewmodel()
+## Puts `new_definition` into a slot. Omit the ammo to get a fresh, fully stocked weapon.
+func equip(slot_index: int, new_definition: WeaponDefinition, mag := -1, spare := -1) -> void:
+	var slot := _slots[slot_index]
+	slot.definition = new_definition
+	slot.in_mag = new_definition.magazine_size if mag < 0 else mag
+	slot.reserve = new_definition.reserve_ammo if spare < 0 else spare
+	slot.cooldown = 0.0
+	slot.reload_left = 0.0
+	_reload_queue.erase(slot_index)
+	_rebuild_viewmodel(slot)
+	_advance_reload_queue()
 	_move_to_pose(_aiming)
-	weapon_changed.emit(definition)
-	ammo_changed.emit(in_mag, reserve)
-	reloading_changed.emit(false)
+	_update_spread()
+	weapon_changed.emit(slot_index, new_definition)
+	ammo_changed.emit(slot_index, slot.in_mag, slot.reserve)
+	reloading_changed.emit(slot_index, false)
+
+
+func _clear(slot_index: int) -> void:
+	var slot := _slots[slot_index]
+	slot.definition = null
+	slot.reload_left = 0.0
+	_reload_queue.erase(slot_index)
+	_rebuild_viewmodel(slot)
+	_advance_reload_queue()
+	_update_spread()
+	weapon_changed.emit(slot_index, null)
+	reloading_changed.emit(slot_index, false)
 
 
 func _physics_process(delta: float) -> void:
@@ -93,27 +124,38 @@ func _physics_process(delta: float) -> void:
 	_update_spread()
 
 	if GameInput.just_pressed(&"interact"):
-		_try_interact()
+		_try_pickup(false)
+	elif GameInput.just_pressed(&"interact_alt"):
+		_try_pickup(true)
 	if GameInput.just_pressed(&"reload"):
 		_start_reload()
 
-	if _reload_left > 0.0:
-		_reload_left -= delta
-		if _reload_left <= 0.0:
-			_finish_reload()
+	_tick_slot(PRIMARY, &"fire", delta)
+	_tick_slot(SECONDARY, &"fire_secondary", delta)
+
+
+func _tick_slot(slot_index: int, fire_action: StringName, delta: float) -> void:
+	var slot := _slots[slot_index]
+	if slot.is_empty():
+		return
+	if slot.reload_left > 0.0:
+		slot.reload_left -= delta
+		if slot.reload_left <= 0.0:
+			_finish_reload(slot_index)
 		return
 
-	_cooldown -= delta
-	if GameInput.held(&"fire") and _cooldown <= COOLDOWN_EPSILON and in_mag > 0:
-		_cooldown = definition.fire_cooldown
-		in_mag -= 1
-		ammo_changed.emit(in_mag, reserve)
-		_fire()
+	slot.cooldown -= delta
+	if GameInput.held(fire_action) and not is_reloading() and slot.cooldown <= COOLDOWN_EPSILON and slot.in_mag > 0:
+		slot.cooldown = slot.definition.fire_cooldown
+		slot.in_mag -= 1
+		ammo_changed.emit(slot_index, slot.in_mag, slot.reserve)
+		_fire(slot)
 
 
-## Sights come up while the aim button is held, and drop for a reload.
+## Sights come up while the aim button is held. They drop for a reload and are
+## unavailable while wielding two weapons (the aim button's role there is firing).
 func _update_aiming() -> void:
-	var wants_aim := GameInput.held(&"aim") and not is_reloading()
+	var wants_aim := GameInput.held(&"aim") and not is_akimbo() and not primary.is_reloading()
 	if wants_aim == _aiming:
 		return
 	_aiming = wants_aim
@@ -121,15 +163,18 @@ func _update_aiming() -> void:
 	aiming_changed.emit(_aiming)
 
 
-## Tweens the weapon holder and camera FOV to the hip or the aiming pose.
-## Aiming puts the model's "Sight" marker on the camera axis.
+## Tweens the primary weapon holder and camera FOV to the hip or the aiming pose.
+## Aiming puts the model's "Sight" marker on the camera axis. The secondary
+## weapon always rests at its hip pose.
 func _move_to_pose(aiming: bool) -> void:
-	var target_position := _hip_position
-	var target_yaw := _hip_yaw
+	var definition := primary.definition
+	var target_position := primary.hip_position
+	var target_yaw := primary.hip_yaw
 	var target_fov := _hip_fov
 	if aiming:
-		var sight := _viewmodel.find_child("Sight", true, false) as Node3D
-		var sight_in_holder := _viewmodel.basis * _viewmodel.to_local(sight.global_position) if sight else Vector3.ZERO
+		var viewmodel := primary.viewmodel
+		var sight := viewmodel.find_child("Sight", true, false) as Node3D
+		var sight_in_holder := viewmodel.basis * viewmodel.to_local(sight.global_position) if sight else Vector3.ZERO
 		target_position = Vector3(0.0, 0.0, -definition.ads_sight_distance) - sight_in_holder
 		target_yaw = 0.0
 		target_fov = definition.ads_fov
@@ -137,32 +182,36 @@ func _move_to_pose(aiming: bool) -> void:
 	if _pose_tween:
 		_pose_tween.kill()
 	_pose_tween = create_tween().set_parallel().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	_pose_tween.tween_property(_holder, "position", target_position, definition.ads_time)
-	_pose_tween.tween_property(_holder, "rotation:y", target_yaw, definition.ads_time)
+	_pose_tween.tween_property(primary.holder, "position", target_position, definition.ads_time)
+	_pose_tween.tween_property(primary.holder, "rotation:y", target_yaw, definition.ads_time)
 	_pose_tween.tween_property(_camera, "fov", target_fov, definition.ads_time)
 
 
 func _update_spread() -> void:
-	var degrees: float
-	if _aiming:
-		degrees = definition.ads_spread_deg
-	elif _player.horizontal_speed() > MOVING_SPEED_THRESHOLD:
-		degrees = definition.hip_spread_moving_deg
-	else:
-		degrees = definition.hip_spread_standing_deg
-	if not is_equal_approx(degrees, _spread_deg):
-		_spread_deg = degrees
-		spread_changed.emit(degrees)
+	var widest := 0.0
+	for slot in _slots:
+		if slot.is_empty():
+			continue
+		if _aiming and slot == primary:
+			slot.spread_deg = slot.definition.ads_spread_deg
+		elif _player.horizontal_speed() > MOVING_SPEED_THRESHOLD:
+			slot.spread_deg = slot.definition.hip_spread_moving_deg
+		else:
+			slot.spread_deg = slot.definition.hip_spread_standing_deg
+		widest = maxf(widest, slot.spread_deg)
+	if not is_equal_approx(widest, _crosshair_spread_deg):
+		_crosshair_spread_deg = widest
+		spread_changed.emit(widest)
 
 
-func _fire() -> void:
+func _fire(slot: WeaponSlot) -> void:
 	var origin := _camera.global_position
-	var direction := _apply_spread(-_camera.global_basis.z, _camera.global_basis)
+	var direction := _apply_spread(-_camera.global_basis.z, _camera.global_basis, slot.spread_deg)
 	var query := PhysicsRayQueryParameters3D.create(origin, origin + direction * MAX_RANGE, BULLET_MASK)
 	var hit := _player.get_world_3d().direct_space_state.intersect_ray(query)
 
 	var muzzle := origin + direction * MUZZLE_FALLBACK_DISTANCE
-	var muzzle_marker := _viewmodel.find_child("Muzzle", true, false) as Node3D if _viewmodel else null
+	var muzzle_marker := slot.muzzle_marker()
 	if muzzle_marker:
 		muzzle = muzzle_marker.global_position
 
@@ -176,15 +225,15 @@ func _fire() -> void:
 			collider.take_hit()
 			hit_confirmed.emit()
 
-	_kick_recoil()
-	fired.emit(definition)
+	_kick_recoil(slot)
+	fired.emit(slot.definition)
 
 
-## Random direction inside the shot cone (half-angle `_spread_deg`).
-func _apply_spread(forward: Vector3, basis: Basis) -> Vector3:
-	if _spread_deg <= 0.0:
+## Random direction inside the shot cone (half-angle `spread_deg`).
+func _apply_spread(forward: Vector3, basis: Basis, spread_deg: float) -> Vector3:
+	if spread_deg <= 0.0:
 		return forward
-	var spread := deg_to_rad(_spread_deg)
+	var spread := deg_to_rad(spread_deg)
 	var spin := randf() * TAU
 	# sqrt() samples the cone's circular cross-section uniformly instead of
 	# bunching shots toward the centre.
@@ -193,41 +242,91 @@ func _apply_spread(forward: Vector3, basis: Basis) -> Vector3:
 
 
 ## Kicks the model itself (not the holder), so recoil never fights the aim tween.
-func _kick_recoil() -> void:
-	if _recoil_tween:
-		_recoil_tween.kill()
-	_viewmodel.position.z = RECOIL_KICK * (RECOIL_KICK_ADS_SCALE if _aiming else 1.0)
-	_recoil_tween = create_tween().set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
-	_recoil_tween.tween_property(_viewmodel, "position:z", 0.0, RECOIL_RECOVERY_TIME)
+func _kick_recoil(slot: WeaponSlot) -> void:
+	if slot.recoil_tween:
+		slot.recoil_tween.kill()
+	slot.viewmodel.position.z = RECOIL_KICK * (RECOIL_KICK_ADS_SCALE if _aiming else 1.0)
+	slot.recoil_tween = create_tween().set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	slot.recoil_tween.tween_property(slot.viewmodel, "position:z", 0.0, RECOIL_RECOVERY_TIME)
 
 
+## Reloads every weapon that isn't full, left hand first, one after the other.
+## Full weapons are skipped; if all are full nothing happens.
 func _start_reload() -> void:
-	if is_reloading() or in_mag >= definition.magazine_size or reserve <= 0:
+	if is_reloading():
 		return
-	_reload_left = definition.reload_duration
-	reloading_changed.emit(true)
-	reload_started.emit(definition)
+	for slot_index in [SECONDARY, PRIMARY]:
+		if _needs_reload(_slots[slot_index]):
+			_reload_queue.append(slot_index)
+	_advance_reload_queue()
 
 
-func _finish_reload() -> void:
-	var transferred := mini(definition.magazine_size - in_mag, reserve)
-	in_mag += transferred
-	reserve -= transferred
-	ammo_changed.emit(in_mag, reserve)
-	reloading_changed.emit(false)
+func _needs_reload(slot: WeaponSlot) -> bool:
+	return not slot.is_empty() and slot.in_mag < slot.definition.magazine_size and slot.reserve > 0
 
 
-func _rebuild_viewmodel() -> void:
-	if _recoil_tween:
-		_recoil_tween.kill()
-	if _viewmodel:
-		_holder.remove_child(_viewmodel)
-		_viewmodel.queue_free()
-	_viewmodel = definition.model.instantiate()
-	_holder.add_child(_viewmodel)
+## Starts the next queued reload, if none is running.
+func _advance_reload_queue() -> void:
+	if primary.is_reloading() or secondary.is_reloading():
+		return
+	while not _reload_queue.is_empty():
+		var slot_index: int = _reload_queue.pop_front()
+		var slot := _slots[slot_index]
+		if not _needs_reload(slot):
+			continue
+		slot.reload_left = slot.definition.reload_duration
+		reloading_changed.emit(slot_index, true)
+		reload_started.emit(slot.definition)
+		return
 
 
-func _try_interact() -> void:
+func _finish_reload(slot_index: int) -> void:
+	var slot := _slots[slot_index]
+	var transferred := mini(slot.definition.magazine_size - slot.in_mag, slot.reserve)
+	slot.in_mag += transferred
+	slot.reserve -= transferred
+	ammo_changed.emit(slot_index, slot.in_mag, slot.reserve)
+	reloading_changed.emit(slot_index, false)
+	_advance_reload_queue()
+
+
+func _rebuild_viewmodel(slot: WeaponSlot) -> void:
+	if slot.recoil_tween:
+		slot.recoil_tween.kill()
+	if slot.viewmodel:
+		slot.holder.remove_child(slot.viewmodel)
+		slot.viewmodel.queue_free()
+		slot.viewmodel = null
+	if slot.definition:
+		slot.viewmodel = slot.definition.model.instantiate()
+		slot.holder.add_child(slot.viewmodel)
+
+
+## `replace_primary` is the G key. Where an incoming weapon goes:
+## - two-handed: alone in the primary slot, everything held is dropped;
+## - one-handed, G: replaces the primary weapon;
+## - one-handed, F: joins a one-handed primary as the secondary (replacing the
+##   secondary if there already is one), or replaces a two-handed primary.
+## A replaced weapon is always dropped with its ammo, even when it's the same type:
+## ammo belongs to the weapon instance, not the weapon type.
+func _try_pickup(replace_primary: bool) -> void:
+	var best := _find_pickup()
+	if best == null:
+		return
+
+	var incoming := best.definition
+	var target := PRIMARY
+	if not incoming.one_handed:
+		_drop_slot(SECONDARY)
+	elif not replace_primary and primary.definition.one_handed:
+		target = SECONDARY
+	_drop_slot(target)
+	equip(target, incoming, best.ammo_in_mag, best.ammo_reserve)
+	best.collect()
+	picked_up.emit()
+
+
+func _find_pickup() -> PickupArea:
 	var best: PickupArea = null
 	var best_distance := INF
 	for area in _player.interact_area.get_overlapping_areas():
@@ -238,23 +337,24 @@ func _try_interact() -> void:
 		if best == null or pickup.pickup_priority < best.pickup_priority or (pickup.pickup_priority == best.pickup_priority and distance < best_distance):
 			best = pickup
 			best_distance = distance
-	if best == null:
+	return best
+
+
+## Throws the slot's weapon into the world and empties the slot (unless the
+## caller refills it right away). Does nothing for an empty slot.
+func _drop_slot(slot_index: int) -> void:
+	var slot := _slots[slot_index]
+	if slot.is_empty():
 		return
-
-	# The held weapon is always dropped, even when picking up the same type:
-	# ammo belongs to the weapon instance, not the weapon type.
-	_drop_current()
-	equip(best.definition, best.ammo_in_mag, best.ammo_reserve)
-	best.collect()
-	picked_up.emit()
-
-
-func _drop_current() -> void:
 	var dropped := dropped_weapon_scene.instantiate() as DroppedWeapon
-	dropped.setup(definition, in_mag, reserve)
+	dropped.setup(slot.definition, slot.in_mag, slot.reserve)
 	_player.get_parent().add_child(dropped)
 
 	var forward := Vector3(-sin(_player.yaw), 0.0, -cos(_player.yaw))
-	dropped.global_position = _player.global_position + forward * THROW_FORWARD_OFFSET + Vector3.UP * THROW_ORIGIN_HEIGHT
+	var right := Vector3(cos(_player.yaw), 0.0, -sin(_player.yaw))
+	var side := THROW_SIDE_OFFSET * (1.0 if slot_index == PRIMARY else -1.0)
+	dropped.global_position = _player.global_position + forward * THROW_FORWARD_OFFSET + right * side + Vector3.UP * THROW_ORIGIN_HEIGHT
 	dropped.linear_velocity = forward * THROW_FORWARD_SPEED + Vector3.UP * THROW_UP_SPEED
 	dropped.angular_velocity = Vector3(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * THROW_MAX_TUMBLE
+	if slot_index == SECONDARY:
+		_clear(SECONDARY)

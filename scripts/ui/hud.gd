@@ -8,9 +8,11 @@ const STATS_INTERVAL := 0.5
 var _player: Player
 var _weapons: WeaponManager
 var _hits := 0
-var _in_mag := 0
-var _reserve := 0
-var _reloading := false
+## Per-hand state, indexed by `WeaponManager.PRIMARY` / `SECONDARY`.
+var _names: Array[String] = ["", ""]
+var _in_mag: Array[int] = [0, 0]
+var _reserve: Array[int] = [0, 0]
+var _reloading: Array[bool] = [false, false]
 var _stats_time := 0.0
 var _tick_count := 0
 
@@ -32,8 +34,10 @@ func bind(player: Player, weapons: WeaponManager) -> void:
 	weapons.spread_changed.connect(_crosshair.set_spread)
 	weapons.hit_confirmed.connect(_on_hit_confirmed)
 
-	_on_weapon_changed(weapons.definition)
-	_on_ammo_changed(weapons.in_mag, weapons.reserve)
+	for slot_index in 2:
+		var slot := weapons.primary if slot_index == WeaponManager.PRIMARY else weapons.secondary
+		_on_weapon_changed(slot_index, slot.definition)
+		_on_ammo_changed(slot_index, slot.in_mag, slot.reserve)
 	_crosshair.set_spread(weapons.current_spread_deg())
 	_update_hits()
 
@@ -56,21 +60,23 @@ func _process(delta: float) -> void:
 
 	if _debug_label.visible and _player:
 		var v := _player.velocity
-		_debug_label.text = "Weapon: %s\nSpeed: %.2f (H: %.2f V: %.2f)" % [_weapons.definition.display_name, v.length(), _player.horizontal_speed(), v.y]
+		_debug_label.text = "Weapon: %s\nSpeed: %.2f (H: %.2f V: %.2f)" % [_weapons.primary.definition.display_name, v.length(), _player.horizontal_speed(), v.y]
 
 
-func _on_weapon_changed(definition: WeaponDefinition) -> void:
-	_weapon_label.text = "Weapon: %s" % definition.display_name
-
-
-func _on_ammo_changed(in_mag: int, reserve: int) -> void:
-	_in_mag = in_mag
-	_reserve = reserve
+func _on_weapon_changed(slot: int, definition: WeaponDefinition) -> void:
+	_names[slot] = definition.display_name if definition else ""
+	_update_weapon()
 	_update_ammo()
 
 
-func _on_reloading_changed(reloading: bool) -> void:
-	_reloading = reloading
+func _on_ammo_changed(slot: int, in_mag: int, reserve: int) -> void:
+	_in_mag[slot] = in_mag
+	_reserve[slot] = reserve
+	_update_ammo()
+
+
+func _on_reloading_changed(slot: int, reloading: bool) -> void:
+	_reloading[slot] = reloading
 	_update_ammo()
 
 
@@ -80,8 +86,23 @@ func _on_hit_confirmed() -> void:
 	_hitmarker.flash()
 
 
+## With two weapons the left hand is listed first, matching the screen.
+func _update_weapon() -> void:
+	var hands := _held_hands()
+	_weapon_label.text = "Weapon: " + " | ".join(hands.map(func(h: int) -> String: return _names[h]))
+
+
 func _update_ammo() -> void:
-	_ammo_label.text = "Reloading..." if _reloading else "Ammo: %d / %d" % [_in_mag, _reserve]
+	var hands := _held_hands()
+	_ammo_label.text = "Ammo: " + " | ".join(hands.map(_hand_ammo_text))
+
+
+func _hand_ammo_text(slot: int) -> String:
+	return "Reloading..." if _reloading[slot] else "%d / %d" % [_in_mag[slot], _reserve[slot]]
+
+
+func _held_hands() -> Array:
+	return [WeaponManager.PRIMARY] if _names[WeaponManager.SECONDARY].is_empty() else [WeaponManager.SECONDARY, WeaponManager.PRIMARY]
 
 
 func _update_hits() -> void:

@@ -8,6 +8,7 @@ script = ExtResource("1_script")
 id = &"smg"
 display_name = "SMG"
 model = ExtResource("2_model")
+one_handed = true
 fire_cooldown = 0.1
 fire_pitch_scale = 1.35
 ads_sight_distance = 0.35

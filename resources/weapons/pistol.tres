@@ -8,6 +8,7 @@ script = ExtResource("1_script")
 id = &"pistol"
 display_name = "Pistol"
 model = ExtResource("2_model")
+one_handed = true
 ads_fov = 65.0
 ads_time = 0.12
 ads_sight_distance = 0.35
