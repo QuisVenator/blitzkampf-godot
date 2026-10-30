@@ -1,0 +1,43 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/weapon_spawner.gd" id="1_script"]
+[ext_resource type="Script" path="res://scripts/weapons/pickup_area.gd" id="2_pickup"]
+
+[sub_resource type="StandardMaterial3D" id="pad_material"]
+albedo_color = Color(0.165, 0.165, 0.188, 1)
+roughness = 0.6
+
+[sub_resource type="CylinderMesh" id="pad_mesh"]
+top_radius = 0.6
+bottom_radius = 0.6
+height = 0.08
+radial_segments = 20
+
+[sub_resource type="SphereShape3D" id="pickup_sphere"]
+radius = 0.1
+
+[node name="WeaponSpawner" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="Pad" type="MeshInstance3D" parent="."]
+mesh = SubResource("pad_mesh")
+surface_material_override/0 = SubResource("pad_material")
+
+[node name="Marker" type="Node3D" parent="."]
+position = Vector3(0, 0.45, 0)
+rotation = Vector3(-0.25, 0, 0)
+scale = Vector3(1.6, 1.6, 1.6)
+
+[node name="Spinner" type="Node3D" parent="Marker"]
+
+[node name="PickupArea" type="Area3D" parent="."]
+collision_layer = 8
+collision_mask = 0
+monitoring = false
+script = ExtResource("2_pickup")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="PickupArea"]
+shape = SubResource("pickup_sphere")
+
+[node name="RespawnTimer" type="Timer" parent="."]
+one_shot = true

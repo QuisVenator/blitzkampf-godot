@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="WeaponDefinition" format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/weapon_definition.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://scenes/weapons/shotgun_model.tscn" id="2_model"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"shotgun"
+display_name = "Shotgun"
+model = ExtResource("2_model")
+fire_cooldown = 0.6
+fire_pitch_scale = 0.7
+magazine_size = 6
+reserve_ammo = 18
+reload_duration = 2.0
+ads_spread_deg = 0.5
+hip_spread_standing_deg = 4.0
+hip_spread_moving_deg = 6.0

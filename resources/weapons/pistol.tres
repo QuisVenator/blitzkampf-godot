@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="WeaponDefinition" format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/weapon_definition.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://scenes/weapons/pistol_model.tscn" id="2_model"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"pistol"
+display_name = "Pistol"
+model = ExtResource("2_model")
+fire_cooldown = 0.35
+fire_pitch_scale = 1.0
+magazine_size = 8
+reserve_ammo = 24
+reload_duration = 1.2
+ads_spread_deg = 0.1
+hip_spread_standing_deg = 1.2
+hip_spread_moving_deg = 2.4

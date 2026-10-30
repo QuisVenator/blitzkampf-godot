@@ -1,0 +1,34 @@
+extends Node3D
+## Wires the pieces together: places the player, captures the mouse, and
+## connects gameplay signals to the HUD and sound effects.
+
+@onready var _player: Player = $Player
+@onready var _weapons: WeaponManager = $Player/WeaponManager
+@onready var _hud: Hud = $Hud
+@onready var _sfx: Sfx = $Sfx
+
+
+func _ready() -> void:
+	var spawn := get_tree().get_first_node_in_group(&"player_spawn") as Node3D
+	if spawn:
+		_player.teleport(spawn.global_position, spawn.global_rotation.y)
+
+	_hud.bind(_player, _weapons)
+
+	_player.jumped.connect(_sfx.play.bind(&"jump"))
+	_player.stepped.connect(_sfx.play.bind(&"footstep"))
+	_weapons.fired.connect(func(definition: WeaponDefinition) -> void: _sfx.play(&"fire", definition.fire_pitch_scale))
+	_weapons.hit_confirmed.connect(_sfx.play.bind(&"hit"))
+	_weapons.reload_started.connect(func(_definition: WeaponDefinition) -> void: _sfx.play(&"reload"))
+	_weapons.picked_up.connect(_sfx.play.bind(&"pickup"))
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and not GameInput.is_active():
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	elif event.is_action_pressed(&"ui_cancel"):
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+
+func _process(_delta: float) -> void:
+	_hud.set_prompt_visible(not GameInput.is_active())

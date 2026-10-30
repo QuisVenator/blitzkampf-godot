@@ -1,0 +1,53 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="body_material"]
+albedo_color = Color(0.29, 0.565, 0.886, 1)
+metallic = 0.6
+roughness = 0.4
+
+[sub_resource type="StandardMaterial3D" id="dark_metal"]
+albedo_color = Color(0.094, 0.094, 0.102, 1)
+metallic = 0.5
+roughness = 0.5
+
+[sub_resource type="BoxMesh" id="body_mesh"]
+size = Vector3(0.1, 0.12, 0.42)
+
+[sub_resource type="CylinderMesh" id="barrel_mesh"]
+top_radius = 0.025
+bottom_radius = 0.025
+height = 0.28
+radial_segments = 12
+
+[sub_resource type="BoxMesh" id="grip_mesh"]
+size = Vector3(0.07, 0.18, 0.08)
+
+[sub_resource type="BoxMesh" id="magazine_mesh"]
+size = Vector3(0.05, 0.14, 0.07)
+
+[node name="PistolModel" type="Node3D"]
+
+[node name="Body" type="MeshInstance3D" parent="."]
+mesh = SubResource("body_mesh")
+surface_material_override/0 = SubResource("body_material")
+
+[node name="Barrel" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.02, -0.32)
+rotation = Vector3(1.5707964, 0, 0)
+mesh = SubResource("barrel_mesh")
+surface_material_override/0 = SubResource("dark_metal")
+
+[node name="Grip" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.12, 0.12)
+rotation = Vector3(-0.25, 0, 0)
+mesh = SubResource("grip_mesh")
+surface_material_override/0 = SubResource("dark_metal")
+
+[node name="Magazine" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.1, 0.02)
+rotation = Vector3(0.15, 0, 0)
+mesh = SubResource("magazine_mesh")
+surface_material_override/0 = SubResource("dark_metal")
+
+[node name="Muzzle" type="Marker3D" parent="."]
+position = Vector3(0, 0.02, -0.46)

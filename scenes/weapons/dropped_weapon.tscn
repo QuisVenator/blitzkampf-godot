@@ -1,0 +1,31 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/dropped_weapon.gd" id="1_script"]
+[ext_resource type="Script" path="res://scripts/weapons/pickup_area.gd" id="2_pickup"]
+
+[sub_resource type="BoxShape3D" id="body_box"]
+size = Vector3(0.2, 0.4, 0.8)
+
+[sub_resource type="SphereShape3D" id="pickup_sphere"]
+radius = 0.1
+
+[node name="DroppedWeapon" type="RigidBody3D"]
+collision_layer = 16
+collision_mask = 17
+script = ExtResource("1_script")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+position = Vector3(0, -0.05, -0.25)
+shape = SubResource("body_box")
+
+[node name="Visual" type="Node3D" parent="."]
+scale = Vector3(1.6, 1.6, 1.6)
+
+[node name="PickupArea" type="Area3D" parent="."]
+collision_layer = 8
+collision_mask = 0
+monitoring = false
+script = ExtResource("2_pickup")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="PickupArea"]
+shape = SubResource("pickup_sphere")

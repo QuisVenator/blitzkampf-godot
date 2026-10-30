@@ -1,0 +1,64 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/player/player.gd" id="1_player"]
+[ext_resource type="Resource" path="res://resources/player/movement_settings.tres" id="2_settings"]
+[ext_resource type="Script" path="res://scripts/weapons/weapon_manager.gd" id="3_weapons"]
+[ext_resource type="Resource" path="res://resources/weapons/pistol.tres" id="4_pistol"]
+[ext_resource type="PackedScene" path="res://scenes/weapons/dropped_weapon.tscn" id="5_dropped"]
+[ext_resource type="Script" path="res://scripts/weapons/shot_effects.gd" id="6_effects"]
+
+[sub_resource type="CapsuleShape3D" id="body_capsule"]
+radius = 0.3
+height = 1.8
+
+[sub_resource type="SphereShape3D" id="headroom_sphere"]
+radius = 0.28
+
+[sub_resource type="SphereShape3D" id="interact_sphere"]
+radius = 1.1
+
+[node name="Player" type="CharacterBody3D"]
+collision_layer = 2
+collision_mask = 1
+script = ExtResource("1_player")
+settings = ExtResource("2_settings")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+position = Vector3(0, 0.9, 0)
+shape = SubResource("body_capsule")
+
+[node name="HeadroomCast" type="ShapeCast3D" parent="."]
+position = Vector3(0, 1.5, 0)
+shape = SubResource("headroom_sphere")
+target_position = Vector3(0, 0, 0)
+collision_mask = 1
+
+[node name="Head" type="Node3D" parent="."]
+top_level = true
+physics_interpolation_mode = 2
+
+[node name="Camera3D" type="Camera3D" parent="Head"]
+fov = 75.0
+near = 0.1
+far = 500.0
+
+[node name="WeaponHolder" type="Node3D" parent="Head/Camera3D"]
+position = Vector3(0.28, -0.24, -0.5)
+rotation = Vector3(0, 0.0628319, 0)
+
+[node name="InteractArea" type="Area3D" parent="."]
+collision_layer = 0
+collision_mask = 8
+monitorable = false
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="InteractArea"]
+shape = SubResource("interact_sphere")
+
+[node name="WeaponManager" type="Node" parent="."]
+script = ExtResource("3_weapons")
+starting_weapon = ExtResource("4_pistol")
+dropped_weapon_scene = ExtResource("5_dropped")
+
+[node name="ShotEffects" type="Node3D" parent="WeaponManager"]
+top_level = true
+script = ExtResource("6_effects")

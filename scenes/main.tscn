@@ -1,0 +1,19 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/core/main.gd" id="1_main"]
+[ext_resource type="PackedScene" path="res://scenes/maps/test_arena.tscn" id="2_arena"]
+[ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="3_player"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="4_hud"]
+[ext_resource type="Script" path="res://scripts/audio/sfx.gd" id="5_sfx"]
+
+[node name="Main" type="Node3D"]
+script = ExtResource("1_main")
+
+[node name="TestArena" parent="." instance=ExtResource("2_arena")]
+
+[node name="Player" parent="." instance=ExtResource("3_player")]
+
+[node name="Hud" parent="." instance=ExtResource("4_hud")]
+
+[node name="Sfx" type="Node" parent="."]
+script = ExtResource("5_sfx")
