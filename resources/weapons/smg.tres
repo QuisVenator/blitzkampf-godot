@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="WeaponDefinition" format=3]
+[gd_resource type="Resource" script_class="WeaponDefinition" format=3 uid="uid://dworgjktv2xdu"]
 
-[ext_resource type="Script" path="res://scripts/weapons/weapon_definition.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://c81724s2lmmit" path="res://scripts/weapons/weapon_definition.gd" id="1_script"]
 [ext_resource type="PackedScene" path="res://scenes/weapons/smg_model.tscn" id="2_model"]
 
 [resource]
@@ -10,12 +10,10 @@ display_name = "SMG"
 model = ExtResource("2_model")
 fire_cooldown = 0.1
 fire_pitch_scale = 1.35
+ads_sight_distance = 0.35
 magazine_size = 25
 reserve_ammo = 75
 reload_duration = 1.6
 ads_spread_deg = 0.2
 hip_spread_standing_deg = 2.5
 hip_spread_moving_deg = 4.5
-ads_fov = 62.0
-ads_time = 0.15
-ads_sight_distance = 0.35

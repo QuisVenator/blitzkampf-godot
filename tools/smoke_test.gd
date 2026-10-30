@@ -82,7 +82,7 @@ func _run() -> void:
 	await create_timer(0.7).timeout
 	_check("aiming", _weapons.is_aiming())
 	_check_near("ads fov", _player.camera.fov, _weapons.definition.ads_fov, 0.1)
-	var sight := _player.camera.get_node("WeaponHolder").get_child(0).get_node("Sight") as Node3D
+	var sight := _player.camera.get_node("WeaponHolder").get_child(0).find_child("Sight", true, false) as Node3D
 	var sight_local := _player.camera.to_local(sight.global_position)
 	_check_near("sight centred horizontally", sight_local.x, 0.0, 0.002)
 	_check_near("sight centred vertically", sight_local.y, 0.0, 0.002)

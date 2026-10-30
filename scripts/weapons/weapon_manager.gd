@@ -128,8 +128,8 @@ func _move_to_pose(aiming: bool) -> void:
 	var target_yaw := _hip_yaw
 	var target_fov := _hip_fov
 	if aiming:
-		var sight := _viewmodel.get_node_or_null(^"Sight") as Node3D
-		var sight_in_holder := _viewmodel.basis * sight.position if sight else Vector3.ZERO
+		var sight := _viewmodel.find_child("Sight", true, false) as Node3D
+		var sight_in_holder := _viewmodel.basis * _viewmodel.to_local(sight.global_position) if sight else Vector3.ZERO
 		target_position = Vector3(0.0, 0.0, -definition.ads_sight_distance) - sight_in_holder
 		target_yaw = 0.0
 		target_fov = definition.ads_fov
@@ -162,7 +162,7 @@ func _fire() -> void:
 	var hit := _player.get_world_3d().direct_space_state.intersect_ray(query)
 
 	var muzzle := origin + direction * MUZZLE_FALLBACK_DISTANCE
-	var muzzle_marker := _viewmodel.get_node_or_null(^"Muzzle") as Node3D if _viewmodel else null
+	var muzzle_marker := _viewmodel.find_child("Muzzle", true, false) as Node3D if _viewmodel else null
 	if muzzle_marker:
 		muzzle = muzzle_marker.global_position
 

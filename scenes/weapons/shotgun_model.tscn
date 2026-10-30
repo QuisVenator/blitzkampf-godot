@@ -1,15 +1,14 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://47pmrynmcrse"]
 
-[ext_resource type="PackedScene" path="res://assets/models/quaternius_guns/Shotgun_3.fbx" id="1_model"]
+[ext_resource type="PackedScene" uid="uid://dfdwx7o83nybs" path="res://assets/models/quaternius_guns/Shotgun_3.fbx" id="1_model"]
 
-[node name="ShotgunModel" type="Node3D"]
+[node name="ShotgunModel" type="Node3D" unique_id=835385663]
 
-[node name="Model" parent="." instance=ExtResource("1_model")]
-rotation_degrees = Vector3(0, 90, 0)
-scale = Vector3(0.12, 0.12, 0.12)
+[node name="Model" parent="." unique_id=570929304 instance=ExtResource("1_model")]
+transform = Transform3D(-1.13649605e-08, 0, 0.26, 0, 0.26, 0, -0.26, 0, -1.13649605e-08, 0, 0, 0)
 
-[node name="Muzzle" type="Marker3D" parent="."]
-position = Vector3(0, 0.0264, -0.5172)
+[node name="Muzzle" type="Marker3D" parent="Model" unique_id=1219507729]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.31, 0.22, 0)
 
-[node name="Sight" type="Marker3D" parent="."]
-position = Vector3(0, 0.0450, -0.0228)
+[node name="Sight" type="Marker3D" parent="Model" unique_id=1245447006]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.19, 0.375, 0)
