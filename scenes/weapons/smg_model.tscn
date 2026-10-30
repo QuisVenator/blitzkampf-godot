@@ -5,10 +5,10 @@
 [node name="SmgModel" type="Node3D" unique_id=28637070]
 
 [node name="Model" parent="." unique_id=1094545514 instance=ExtResource("1_model")]
-transform = Transform3D(-6.993822e-09, 0, 0.16, 0, 0.16, 0, -0.16, 0, -6.993822e-09, 0, 0, 0)
+transform = Transform3D(-9.616506e-09, 0, 0.22, 0, 0.22, 0, -0.22, 0, -9.616506e-09, 0, 0, 0)
 
 [node name="Muzzle" type="Marker3D" parent="Model" unique_id=88140246]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.19, 0.51, 0)
 
 [node name="Sight" type="Marker3D" parent="Model" unique_id=1159182595]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.12, 0.84, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)

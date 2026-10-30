@@ -5,10 +5,10 @@
 [node name="ShotgunModel" type="Node3D" unique_id=835385663]
 
 [node name="Model" parent="." unique_id=570929304 instance=ExtResource("1_model")]
-transform = Transform3D(-1.13649605e-08, 0, 0.26, 0, 0.26, 0, -0.26, 0, -1.13649605e-08, 0, 0, 0)
+transform = Transform3D(-1.3113417e-08, 0, 0.3, 0, 0.3, 0, -0.3, 0, -1.3113417e-08, 0, 0, 0)
 
 [node name="Muzzle" type="Marker3D" parent="Model" unique_id=1219507729]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.31, 0.22, 0)
 
 [node name="Sight" type="Marker3D" parent="Model" unique_id=1245447006]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.19, 0.375, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
