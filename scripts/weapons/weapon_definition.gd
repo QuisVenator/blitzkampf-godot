@@ -5,13 +5,24 @@ extends Resource
 
 @export var id: StringName
 @export var display_name := ""
-## Scene with a "Muzzle" Marker3D, used for the viewmodel, pickups and drops.
+## Scene used for the viewmodel, pickups and drops. Barrel along -Z, with a
+## "Muzzle" Marker3D (tracer origin) and a "Sight" Marker3D (the point that
+## lines up with the screen centre while aiming down sights).
 @export var model: PackedScene
 
 @export_group("Firing")
 @export var fire_cooldown := 0.35
 ## Multiplies the fire sound's pitch so weapons sound distinct.
 @export var fire_pitch_scale := 1.0
+
+@export_group("Aiming down sights")
+## Vertical FOV (degrees) while aiming; the hip FOV is the camera's own.
+@export var ads_fov := 62.0
+## Seconds to raise or lower the weapon between hip and sights.
+@export var ads_time := 0.15
+## How far in front of the camera (m) the Sight marker sits while aiming. Larger
+## for weapons whose rear (stock) would otherwise crowd the view.
+@export var ads_sight_distance := 0.42
 
 @export_group("Ammo")
 @export var magazine_size := 8

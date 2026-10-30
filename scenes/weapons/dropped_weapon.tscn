@@ -4,7 +4,7 @@
 [ext_resource type="Script" path="res://scripts/weapons/pickup_area.gd" id="2_pickup"]
 
 [sub_resource type="BoxShape3D" id="body_box"]
-size = Vector3(0.2, 0.4, 0.8)
+size = Vector3(0.2, 0.35, 0.55)
 
 [sub_resource type="SphereShape3D" id="pickup_sphere"]
 radius = 0.1
@@ -15,11 +15,11 @@ collision_mask = 17
 script = ExtResource("1_script")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
-position = Vector3(0, -0.05, -0.25)
+position = Vector3(0, 0, 0)
 shape = SubResource("body_box")
 
 [node name="Visual" type="Node3D" parent="."]
-scale = Vector3(1.6, 1.6, 1.6)
+scale = Vector3(1, 1, 1)
 
 [node name="PickupArea" type="Area3D" parent="."]
 collision_layer = 8

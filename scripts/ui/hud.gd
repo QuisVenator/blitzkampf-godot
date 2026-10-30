@@ -21,7 +21,6 @@ var _tick_count := 0
 @onready var _ammo_label: Label = $Root/Info/AmmoLabel
 @onready var _stats_label: Label = $Root/StatsLabel
 @onready var _debug_label: Label = $Root/DebugLabel
-@onready var _prompt: Control = $Root/Prompt
 
 
 func bind(player: Player, weapons: WeaponManager) -> void:
@@ -37,10 +36,6 @@ func bind(player: Player, weapons: WeaponManager) -> void:
 	_on_ammo_changed(weapons.in_mag, weapons.reserve)
 	_crosshair.set_spread(weapons.current_spread_deg())
 	_update_hits()
-
-
-func set_prompt_visible(shown: bool) -> void:
-	_prompt.visible = shown
 
 
 func _unhandled_input(event: InputEvent) -> void:

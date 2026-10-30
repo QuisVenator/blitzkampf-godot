@@ -26,7 +26,7 @@ surface_material_override/0 = SubResource("pad_material")
 [node name="Marker" type="Node3D" parent="."]
 position = Vector3(0, 0.45, 0)
 rotation = Vector3(-0.25, 0, 0)
-scale = Vector3(1.6, 1.6, 1.6)
+scale = Vector3(1, 1, 1)
 
 [node name="Spinner" type="Node3D" parent="Marker"]
 

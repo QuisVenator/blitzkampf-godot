@@ -1,7 +1,7 @@
 class_name GameInput
 extends RefCounted
 ## Input queries that only report while the mouse is captured, so gameplay is
-## inert while the "Click to play" prompt is showing.
+## inert while the cursor is freed (Esc).
 
 
 ## Lets automated tests drive input under the headless display server, which

@@ -7,6 +7,7 @@ signal weapon_changed(definition: WeaponDefinition)
 signal ammo_changed(in_mag: int, reserve: int)
 signal reloading_changed(reloading: bool)
 signal spread_changed(degrees: float)
+signal aiming_changed(aiming: bool)
 signal fired(definition: WeaponDefinition)
 signal reload_started(definition: WeaponDefinition)
 signal hit_confirmed
@@ -21,6 +22,7 @@ const BULLET_MASK := (1 << 0) | (1 << 2)
 const COOLDOWN_EPSILON := 0.0001
 
 const RECOIL_KICK := 0.08
+const RECOIL_KICK_ADS_SCALE := 0.4
 const RECOIL_RECOVERY_TIME := 0.2
 
 const THROW_ORIGIN_HEIGHT := 1.1
@@ -41,20 +43,31 @@ var _reload_left := 0.0
 var _spread_deg := -1.0
 var _viewmodel: Node3D
 var _recoil_tween: Tween
-var _holder_rest_z := 0.0
+var _aiming := false
+var _pose_tween: Tween
+var _hip_position := Vector3.ZERO
+var _hip_yaw := 0.0
+var _hip_fov := 75.0
 
 @onready var _player: Player = get_parent()
+@onready var _camera: Camera3D = $"../Head/Camera3D"
 @onready var _holder: Node3D = $"../Head/Camera3D/WeaponHolder"
 @onready var _effects: ShotEffects = $ShotEffects
 
 
 func _ready() -> void:
-	_holder_rest_z = _holder.position.z
+	_hip_position = _holder.position
+	_hip_yaw = _holder.rotation.y
+	_hip_fov = _camera.fov
 	equip(starting_weapon)
 
 
 func is_reloading() -> bool:
 	return _reload_left > 0.0
+
+
+func is_aiming() -> bool:
+	return _aiming
 
 
 func current_spread_deg() -> float:
@@ -69,12 +82,14 @@ func equip(new_definition: WeaponDefinition, mag := -1, spare := -1) -> void:
 	_cooldown = 0.0
 	_reload_left = 0.0
 	_rebuild_viewmodel()
+	_move_to_pose(_aiming)
 	weapon_changed.emit(definition)
 	ammo_changed.emit(in_mag, reserve)
 	reloading_changed.emit(false)
 
 
 func _physics_process(delta: float) -> void:
+	_update_aiming()
 	_update_spread()
 
 	if GameInput.just_pressed(&"interact"):
@@ -96,9 +111,40 @@ func _physics_process(delta: float) -> void:
 		_fire()
 
 
+## Sights come up while the aim button is held, and drop for a reload.
+func _update_aiming() -> void:
+	var wants_aim := GameInput.held(&"aim") and not is_reloading()
+	if wants_aim == _aiming:
+		return
+	_aiming = wants_aim
+	_move_to_pose(_aiming)
+	aiming_changed.emit(_aiming)
+
+
+## Tweens the weapon holder and camera FOV to the hip or the aiming pose.
+## Aiming puts the model's "Sight" marker on the camera axis.
+func _move_to_pose(aiming: bool) -> void:
+	var target_position := _hip_position
+	var target_yaw := _hip_yaw
+	var target_fov := _hip_fov
+	if aiming:
+		var sight := _viewmodel.get_node_or_null(^"Sight") as Node3D
+		var sight_in_holder := _viewmodel.basis * sight.position if sight else Vector3.ZERO
+		target_position = Vector3(0.0, 0.0, -definition.ads_sight_distance) - sight_in_holder
+		target_yaw = 0.0
+		target_fov = definition.ads_fov
+
+	if _pose_tween:
+		_pose_tween.kill()
+	_pose_tween = create_tween().set_parallel().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_pose_tween.tween_property(_holder, "position", target_position, definition.ads_time)
+	_pose_tween.tween_property(_holder, "rotation:y", target_yaw, definition.ads_time)
+	_pose_tween.tween_property(_camera, "fov", target_fov, definition.ads_time)
+
+
 func _update_spread() -> void:
 	var degrees: float
-	if GameInput.held(&"aim"):
+	if _aiming:
 		degrees = definition.ads_spread_deg
 	elif _player.horizontal_speed() > MOVING_SPEED_THRESHOLD:
 		degrees = definition.hip_spread_moving_deg
@@ -110,9 +156,8 @@ func _update_spread() -> void:
 
 
 func _fire() -> void:
-	var camera := _player.camera
-	var origin := camera.global_position
-	var direction := _apply_spread(-camera.global_basis.z, camera.global_basis)
+	var origin := _camera.global_position
+	var direction := _apply_spread(-_camera.global_basis.z, _camera.global_basis)
 	var query := PhysicsRayQueryParameters3D.create(origin, origin + direction * MAX_RANGE, BULLET_MASK)
 	var hit := _player.get_world_3d().direct_space_state.intersect_ray(query)
 
@@ -147,12 +192,13 @@ func _apply_spread(forward: Vector3, basis: Basis) -> Vector3:
 	return (forward * cos(cone) + basis.x * sin(cone) * cos(spin) + basis.y * sin(cone) * sin(spin)).normalized()
 
 
+## Kicks the model itself (not the holder), so recoil never fights the aim tween.
 func _kick_recoil() -> void:
 	if _recoil_tween:
 		_recoil_tween.kill()
-	_holder.position.z = _holder_rest_z + RECOIL_KICK
+	_viewmodel.position.z = RECOIL_KICK * (RECOIL_KICK_ADS_SCALE if _aiming else 1.0)
 	_recoil_tween = create_tween().set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
-	_recoil_tween.tween_property(_holder, "position:z", _holder_rest_z, RECOIL_RECOVERY_TIME)
+	_recoil_tween.tween_property(_viewmodel, "position:z", 0.0, RECOIL_RECOVERY_TIME)
 
 
 func _start_reload() -> void:
@@ -172,6 +218,8 @@ func _finish_reload() -> void:
 
 
 func _rebuild_viewmodel() -> void:
+	if _recoil_tween:
+		_recoil_tween.kill()
 	if _viewmodel:
 		_holder.remove_child(_viewmodel)
 		_viewmodel.queue_free()

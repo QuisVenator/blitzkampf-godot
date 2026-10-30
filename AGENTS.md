@@ -9,7 +9,7 @@ Status: single-player test arena is playable (movement, 3 weapons, targets, pick
 - GDScript with static typing; `class_name` on anything referenced from another script. Keep warnings clean.
 - Renderer: **GL Compatibility** (keep it; web-export friendly). Physics: **Jolt**. Avoid features Compatibility lacks (e.g. don't rely on `Decal`/SDFGI/volumetrics).
 - 60 Hz physics tick with **physics interpolation enabled** (project settings). Gravity is the project setting `physics/3d/default_gravity = 20`, read via `get_gravity()`; never hard-code it.
-- Input goes through the **Input Map** (actions in `project.godot`), never raw keycodes. Gameplay code queries input via `GameInput` (`scripts/core/game_input.gd`), which reports nothing while the mouse isn't captured (the "Click to play" state).
+- Input goes through the **Input Map** (actions in `project.godot`), never raw keycodes. Gameplay code queries input via `GameInput` (`scripts/core/game_input.gd`), which reports nothing while the mouse isn't captured. The mouse is captured on start; Esc toggles it (frees the cursor for dev/debugging).
 - Named physics layers: 1 `world`, 2 `player`, 3 `target`, 4 `pickup`, 5 `prop` (dropped weapon bodies). Bullets hit world+target; the player collides with world only; pickup `Area3D`s are on `pickup`.
 
 ## Layout
@@ -18,7 +18,9 @@ Status: single-player test arena is playable (movement, 3 weapons, targets, pick
 scenes/main.tscn            entry: arena + player + HUD + Sfx (scripts/core/main.gd wires signals)
 scenes/maps/                maps are .tscn scenes, greyboxed with CSGBox3D (use_collision)
 scenes/player/              player.tscn (CharacterBody3D, top-level Head/Camera3D, WeaponHolder, WeaponManager)
-scenes/weapons/             one *_model.tscn per weapon (with a "Muzzle" Marker3D), dropped_weapon, weapon_spawner
+scenes/weapons/             one *_model.tscn per weapon (imported model + "Muzzle" and "Sight" Marker3Ds), dropped_weapon, weapon_spawner
+assets/models/quaternius_guns/  Quaternius Ultimate Gun Pack FBXs (CC0, see LICENSE.txt) used for the weapon models
+assets/models/blasters/     Kenney Blaster Kit GLBs (CC0), tried first and currently unused
 scenes/world/, scenes/ui/   target, HUD
 resources/weapons/*.tres    WeaponDefinition data, resources/player/movement_settings.tres
 audio/sfx/*.wav             placeholder sounds (regenerate: tools/generate_placeholder_sfx.gd)
@@ -42,6 +44,7 @@ tools/                      smoke_test.gd, generate_placeholder_sfx.gd
 - Sprint is just a higher speed cap, no stamina. Walk 7, sprint 11, crouch 3.5 m/s. Jump 7. Holding jump re-jumps on landing.
 - Grounded with no input stops instantly; friction applies while steering. Air accel 30, air speed cap 7.
 - Crouch is a held stance (Ctrl). A fresh crouch press while sprinting + grounded + moving starts a **slide**: entry speed at least 11, momentum-locked (friction only, no steering), speed held flat for 0.15 s then decays, ends on crouch release, leaving the ground, or dropping to crouch speed. You only stand up if there is headroom (`ShapeCast3D`).
+- **Aiming down sights** (hold RMB, cancelled by reloading): `WeaponManager` tweens the weapon holder so the model's `Sight` marker sits on the camera axis `ads_sight_distance` in front of the camera, and zooms to the weapon's `ads_fov` over `ads_time`; releasing returns to the hip pose captured from `player.tscn`. All three are `WeaponDefinition` fields. Recoil moves the model node itself, not the holder, so it never fights the aim tween.
 - Weapons fire hitscan, automatic while held, gated by per-weapon cooldown. Ammo is **per weapon instance**: picking up a weapon (F, edge-triggered) always drops the held one with its remaining ammo, even if it's the same type. Fresh spawner weapons are fully stocked. Reload is R, blocks firing, no auto-reload; empty mag can't fire.
 - Spread is a flat set of named per-state fields on `WeaponDefinition` (ADS / hip standing / hip moving, moving = horizontal speed > 0.5 m/s). The crosshair renders the same spread value the shot uses. Add a state by adding a field, not a multiplier system.
 - Spawners offer a random weapon from their list and respawn 8 s after pickup. Tracer lasts 0.1 s; impact marks are capped at 60 (oldest recycled) so scatter patterns stay visible.
@@ -50,12 +53,12 @@ tools/                      smoke_test.gd, generate_placeholder_sfx.gd
 
 - `move_and_slide()` collision instead of an AABB sweep, so there is no bit-exact determinism for client prediction. If multiplayer arrives, rethink prediction against Godot's high-level multiplayer rather than reviving the old shared-kinematics idea.
 - Crash/diagnostics logging dropped (browser-only); use Godot's debugger and monitors.
-- Weapon models are scenes instead of procedural meshes, ready to be replaced by Blender/glTF models.
+- Weapon models are scenes wrapping imported models (currently Quaternius' CC0 Ultimate Gun Pack: pistol = Pistol_2, SMG = SubmachineGun_4, shotgun = Shotgun_3) instead of procedural meshes. The pack's FBXs are ~10x too big and face +X, so each model scene rotates the model 90 degrees about Y and scales it by 0.12. To swap a model, change the instance in the `*_model.tscn` so the barrel points along -Z, and reposition its `Muzzle` (tracer origin, barrel tip) and `Sight` (rear-sight top; lines up with screen centre when aiming) markers. Model origin should be near the grip, since the viewmodel holder positions the hand. Pickups and dropped weapons re-centre whatever model they show (`ModelBounds`), and the dropped weapon's collider is sized from the model's bounds.
 
 ## Workflow
 
 - Run the game: `godot --path .` (or the Godot MCP `run_project` / `get_debug_output`). Debug overlay: backtick.
-- After adding scripts with `class_name` or new assets, refresh the class cache/imports: `godot --headless --path . --import`.
+- After adding scripts with `class_name` or new assets, refresh the class cache/imports: `godot --headless --path . --import`. If a GLB was imported before its external texture existed, delete its entries in `.godot/imported/` and import again (touching the file isn't enough).
 - Headless smoke test (scripted input: walk, sprint, slide, jump, shoot, reload, pickup/drop): `godot --headless --path . -s res://tools/smoke_test.gd`; exits non-zero on failure. Keep it passing and extend it when adding gameplay. It uses `GameInput.force_active` because the headless display server doesn't keep the mouse mode.
 - Regenerate placeholder sounds: `godot --headless --path . -s res://tools/generate_placeholder_sfx.gd`, then re-import.
 - Don't hand-edit `.godot/`. Hand-editing `.tscn`/`.tres` is fine for small changes (keep ids unique, re-run the smoke test afterwards); prefer the editor for anything structural. Set project settings via the editor or `ProjectSettings` API, not by guessing the `project.godot` format.
@@ -64,5 +67,5 @@ tools/                      smoke_test.gd, generate_placeholder_sfx.gd
 ## Future work
 
 - Multiplayer (Godot high-level multiplayer; server-authoritative pickups, ammo and hit registration, and spread rolls).
-- Blender-authored props/weapons via Godot's native glTF import; replace the primitive weapon model scenes.
-- Real audio, more maps, optional viewmodel `SubViewport` (no wall clipping, separate FOV), ADS FOV zoom.
+- Blender-authored props/weapons via Godot's native glTF import; replace the Kenney stand-in weapon models.
+- Real audio, more maps, optional viewmodel `SubViewport` (no wall clipping, separate FOV), reload/draw animations.

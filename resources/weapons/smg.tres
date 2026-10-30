@@ -16,3 +16,6 @@ reload_duration = 1.6
 ads_spread_deg = 0.2
 hip_spread_standing_deg = 2.5
 hip_spread_moving_deg = 4.5
+ads_fov = 62.0
+ads_time = 0.15
+ads_sight_distance = 0.35

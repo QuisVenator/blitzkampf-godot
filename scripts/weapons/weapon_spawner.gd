@@ -41,7 +41,9 @@ func _roll_offer() -> void:
 	var offer: WeaponDefinition = offers.pick_random()
 	for child in _spinner.get_children():
 		child.queue_free()
-	_spinner.add_child(offer.model.instantiate())
+	var model := offer.model.instantiate() as Node3D
+	_spinner.add_child(model)
+	ModelBounds.center_in_parent(model)
 
 	_pickup.definition = offer
 	_pickup.ammo_in_mag = -1

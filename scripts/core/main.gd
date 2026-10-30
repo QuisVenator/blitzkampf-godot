@@ -1,5 +1,5 @@
 extends Node3D
-## Wires the pieces together: places the player, captures the mouse, and
+## Wires the pieces together: places the player, captures the mouse (Esc toggles it), and
 ## connects gameplay signals to the HUD and sound effects.
 
 @onready var _player: Player = $Player
@@ -14,6 +14,7 @@ func _ready() -> void:
 		_player.teleport(spawn.global_position, spawn.global_rotation.y)
 
 	_hud.bind(_player, _weapons)
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 	_player.jumped.connect(_sfx.play.bind(&"jump"))
 	_player.stepped.connect(_sfx.play.bind(&"footstep"))
@@ -24,11 +25,5 @@ func _ready() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed and not GameInput.is_active():
-		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-	elif event.is_action_pressed(&"ui_cancel"):
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-
-
-func _process(_delta: float) -> void:
-	_hud.set_prompt_visible(not GameInput.is_active())
+	if event.is_action_pressed(&"ui_cancel"):
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if GameInput.is_active() else Input.MOUSE_MODE_CAPTURED

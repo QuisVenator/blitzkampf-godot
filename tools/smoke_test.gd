@@ -74,6 +74,21 @@ func _run() -> void:
 	_check("ammo decremented", _weapons.in_mag == mag_before - 1)
 	_check("target hit while aiming", _hits >= 1)
 	Input.action_release(&"aim")
+	await create_timer(0.6).timeout
+	_check_near("hip fov restored", _player.camera.fov, 75.0, 0.1)
+
+	# Aiming down sights: zoomed FOV, and the model's Sight marker sits on the camera axis.
+	Input.action_press(&"aim")
+	await create_timer(0.7).timeout
+	_check("aiming", _weapons.is_aiming())
+	_check_near("ads fov", _player.camera.fov, _weapons.definition.ads_fov, 0.1)
+	var sight := _player.camera.get_node("WeaponHolder").get_child(0).get_node("Sight") as Node3D
+	var sight_local := _player.camera.to_local(sight.global_position)
+	_check_near("sight centred horizontally", sight_local.x, 0.0, 0.002)
+	_check_near("sight centred vertically", sight_local.y, 0.0, 0.002)
+	Input.action_release(&"aim")
+	await create_timer(0.4).timeout
+	_check("not aiming after release", not _weapons.is_aiming())
 
 	# Reload.
 	Input.action_press(&"reload")

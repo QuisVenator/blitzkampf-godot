@@ -43,7 +43,7 @@ near = 0.1
 far = 500.0
 
 [node name="WeaponHolder" type="Node3D" parent="Head/Camera3D"]
-position = Vector3(0.28, -0.24, -0.5)
+position = Vector3(0.22, -0.26, -0.42)
 rotation = Vector3(0, 0.0628319, 0)
 
 [node name="InteractArea" type="Area3D" parent="."]
