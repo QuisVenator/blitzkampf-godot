@@ -2,6 +2,8 @@
 
 Godot 4.7 re-implementation of the arena-shooter prototype in `../blitzkampf/` (three.js). That project is a **reference for gameplay and tuning numbers only**, not a structural template: where it worked around three.js limitations (hand-rolled collision, fixed-tick accumulator, procedural meshes, DOM HUD, WebAudio synthesis) this project uses the native Godot approach. Don't port code line by line; ask what the idiomatic Godot way is.
 
+Open work is tracked in `TODO.md`; update it when finishing or adding tasks.
+
 Status: single-player test arena is playable (movement, 3 weapons, targets, pickups, HUD, placeholder SFX). Not started: multiplayer, more maps, real art/audio.
 
 ## Stack and project settings
@@ -9,7 +11,7 @@ Status: single-player test arena is playable (movement, 3 weapons, targets, pick
 - GDScript with static typing; `class_name` on anything referenced from another script. Keep warnings clean.
 - Renderer: **GL Compatibility** (keep it; web-export friendly). Physics: **Jolt**. Avoid features Compatibility lacks (e.g. don't rely on `Decal`/SDFGI/volumetrics).
 - 60 Hz physics tick with **physics interpolation enabled** (project settings). Gravity is the project setting `physics/3d/default_gravity = 20`, read via `get_gravity()`; never hard-code it.
-- Input goes through the **Input Map** (actions in `project.godot`), never raw keycodes. Gameplay code queries input via `GameInput` (`scripts/core/game_input.gd`), which reports nothing while the mouse isn't captured. The mouse is captured on start; Esc toggles it (frees the cursor for dev/debugging).
+- Input goes through the **Input Map** (actions in `project.godot`), never raw keycodes. Gameplay code queries input via `GameInput` (`scripts/core/game_input.gd`), which reports nothing while the mouse isn't captured. The mouse is captured on start. Esc opens the **pause menu** (`PauseMenu`, pauses the scene tree, frees the cursor); Esc/Resume captures it again.
 - Named physics layers: 1 `world`, 2 `player`, 3 `target`, 4 `pickup`, 5 `prop` (dropped weapon bodies). Bullets hit world+target; the player collides with world only; pickup `Area3D`s are on `pickup`.
 
 ## Layout
@@ -18,6 +20,7 @@ Status: single-player test arena is playable (movement, 3 weapons, targets, pick
 scenes/main.tscn            entry: arena + player + HUD + Sfx (scripts/core/main.gd wires signals)
 scenes/maps/                maps are .tscn scenes, greyboxed with CSGBox3D (use_collision)
 scenes/player/              player.tscn (CharacterBody3D, top-level Head/Camera3D, WeaponHolder, WeaponManager)
+scenes/ui/pause_menu.tscn   pause menu (process mode Always); options live in the GameSettings autoload
 scenes/weapons/             one *_model.tscn per weapon (imported model + "Muzzle" and "Sight" Marker3Ds), dropped_weapon, weapon_spawner
 assets/models/quaternius_guns/  Quaternius Ultimate Gun Pack FBXs (CC0, see LICENSE.txt) used for the weapon models
 assets/models/blasters/     Kenney Blaster Kit GLBs (CC0), tried first and currently unused
@@ -29,6 +32,8 @@ tools/                      smoke_test.gd, generate_placeholder_sfx.gd
 ```
 
 ## Architecture rules
+
+- The only autoload is `GameSettings` (`scripts/core/game_settings.gd`): persisted display options (`user://settings.cfg`), applied at startup. Because autoloads don't exist yet when a `-s` test script compiles, `tools/` scripts must not reference scripts that use `GameSettings` by class type (e.g. type the pause menu as `CanvasLayer`).
 
 - Scenes + nodes + signals: call down, signal up. `WeaponManager` and `Player` expose signals; HUD, `Sfx` and `Main` listen. Nothing reaches up into the HUD.
 - Data in `Resource`s and `@export` vars, not constant files or magic numbers. Movement tuning is `MovementSettings` (`resources/player/movement_settings.tres`); weapon stats are `WeaponDefinition`. **Add a weapon = a new `.tres` + model scene, not a code branch.**

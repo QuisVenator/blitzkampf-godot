@@ -122,6 +122,7 @@ func _run() -> void:
 	_check("dropped pistol kept its ammo", _weapons.primary.in_mag == 8 and _weapons.primary.reserve == 23)
 
 	await _test_akimbo()
+	await _test_pause()
 
 	print("smoke test: %s" % ("OK" if _failures == 0 else "%d FAILED" % _failures))
 	quit(1 if _failures > 0 else 0)
@@ -222,6 +223,31 @@ func _test_akimbo() -> void:
 	await _frames(20)
 	await _press(&"interact_alt")
 	_check("G swaps a lone primary", _weapons.primary.definition == smg and not _weapons.is_akimbo())
+
+
+## Esc pauses the tree and shows the menu; Esc again resumes.
+func _test_pause() -> void:
+	# Typed as CanvasLayer: this -s script compiles before autoloads (GameSettings) exist.
+	var menu := _main.get_node("PauseMenu") as CanvasLayer
+	_check("pause menu hidden at start", not menu.visible and not paused)
+	_send_escape()
+	await _frames(2)
+	_check("Esc pauses and shows the menu", paused and menu.visible)
+	var before := _player.global_position
+	Input.action_press(&"move_forward")
+	await _frames(10)
+	Input.action_release(&"move_forward")
+	_check("player frozen while paused", _player.global_position.is_equal_approx(before))
+	_send_escape()
+	await _frames(2)
+	_check("Esc resumes", not paused and not menu.visible)
+
+
+func _send_escape() -> void:
+	var event := InputEventAction.new()
+	event.action = &"ui_cancel"
+	event.pressed = true
+	Input.parse_input_event(event)
 
 
 func _press(action: StringName) -> void:

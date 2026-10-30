@@ -1,5 +1,5 @@
 extends Node3D
-## Wires the pieces together: places the player, captures the mouse (Esc toggles it), and
+## Wires the pieces together: places the player, captures the mouse (the pause menu releases it), and
 ## connects gameplay signals to the HUD and sound effects.
 
 @onready var _player: Player = $Player
@@ -23,7 +23,3 @@ func _ready() -> void:
 	_weapons.reload_started.connect(func(_definition: WeaponDefinition) -> void: _sfx.play(&"reload"))
 	_weapons.picked_up.connect(_sfx.play.bind(&"pickup"))
 
-
-func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed(&"ui_cancel"):
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if GameInput.is_active() else Input.MOUSE_MODE_CAPTURED
