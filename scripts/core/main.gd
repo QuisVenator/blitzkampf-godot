@@ -9,10 +9,7 @@ extends Node3D
 
 
 func _ready() -> void:
-	var spawn := get_tree().get_first_node_in_group(&"player_spawn") as Node3D
-	if spawn:
-		_player.teleport(spawn.global_position, spawn.global_rotation.y)
-
+	_player.spawn()
 	_hud.bind(_player, _weapons)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 

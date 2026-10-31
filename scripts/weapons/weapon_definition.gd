@@ -27,6 +27,10 @@ extends Resource
 ## for weapons whose rear (stock) would otherwise crowd the view.
 @export var ads_sight_distance := 0.42
 
+@export_group("Damage")
+## Health removed per hit (one ray per shot).
+@export var damage := 25
+
 @export_group("Ammo")
 @export var magazine_size := 8
 ## Spare rounds outside the magazine when fully stocked.

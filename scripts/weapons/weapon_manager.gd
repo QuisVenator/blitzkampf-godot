@@ -28,8 +28,9 @@ const MAX_RANGE := 100.0
 ## Horizontal speed (m/s) above which hip-fire uses the "moving" spread.
 const MOVING_SPEED_THRESHOLD := 0.5
 const MUZZLE_FALLBACK_DISTANCE := 0.3
-## Physics layers a bullet hits: world (1) and target (3).
-const BULLET_MASK := (1 << 0) | (1 << 2)
+## Physics layers a bullet hits: world (1), player (2, the body capsule is the
+## hitbox) and target (3). The shooter's own body is excluded from the ray.
+const BULLET_MASK := (1 << 0) | (1 << 1) | (1 << 2)
 const COOLDOWN_EPSILON := 0.0001
 
 const RECOIL_KICK := 0.08
@@ -69,6 +70,8 @@ func _ready() -> void:
 	secondary = WeaponSlot.new($"../Head/Camera3D/WeaponHolderLeft")
 	_slots = [primary, secondary]
 	equip(PRIMARY, starting_weapon)
+	_player.died.connect(_on_player_died)
+	_player.respawned.connect(_on_player_respawned)
 
 
 ## True while any weapon is reloading or waiting to; firing is blocked meanwhile.
@@ -107,6 +110,22 @@ func equip(slot_index: int, new_definition: WeaponDefinition, mag := -1, spare :
 	reloading_changed.emit(slot_index, false)
 
 
+## Dying drops everything held; respawning starts over with the starting weapon.
+func _on_player_died(_attacker: Node) -> void:
+	_drop_slot(SECONDARY)
+	_drop_slot(PRIMARY)
+	_reload_queue.clear()
+	primary.holder.hide()
+	secondary.holder.hide()
+
+
+func _on_player_respawned() -> void:
+	primary.holder.show()
+	secondary.holder.show()
+	_clear(SECONDARY)
+	equip(PRIMARY, starting_weapon)
+
+
 func _clear(slot_index: int) -> void:
 	var slot := _slots[slot_index]
 	slot.definition = null
@@ -122,6 +141,8 @@ func _clear(slot_index: int) -> void:
 func _physics_process(delta: float) -> void:
 	_update_aiming()
 	_update_spread()
+	if not _player.alive:
+		return
 
 	if GameInput.just_pressed(&"interact"):
 		_try_pickup(false)
@@ -155,7 +176,7 @@ func _tick_slot(slot_index: int, fire_action: StringName, delta: float) -> void:
 ## Sights come up while the aim button is held. They drop for a reload and are
 ## unavailable while wielding two weapons (the aim button's role there is firing).
 func _update_aiming() -> void:
-	var wants_aim := GameInput.held(&"aim") and not is_akimbo() and not primary.is_reloading()
+	var wants_aim := _player.alive and GameInput.held(&"aim") and not is_akimbo() and not primary.is_reloading()
 	if wants_aim == _aiming:
 		return
 	_aiming = wants_aim
@@ -208,6 +229,7 @@ func _fire(slot: WeaponSlot) -> void:
 	var origin := _camera.global_position
 	var direction := _apply_spread(-_camera.global_basis.z, _camera.global_basis, slot.spread_deg)
 	var query := PhysicsRayQueryParameters3D.create(origin, origin + direction * MAX_RANGE, BULLET_MASK)
+	query.exclude = [_player.get_rid()]
 	var hit := _player.get_world_3d().direct_space_state.intersect_ray(query)
 
 	var muzzle := origin + direction * MUZZLE_FALLBACK_DISTANCE
@@ -221,8 +243,8 @@ func _fire(slot: WeaponSlot) -> void:
 		_effects.spawn_tracer(muzzle, hit["position"])
 		_effects.spawn_impact(hit["position"], hit["normal"])
 		var collider: Object = hit["collider"]
-		if collider.has_method(&"take_hit"):
-			collider.take_hit()
+		if collider.has_method(&"take_damage"):
+			collider.take_damage(slot.definition.damage, _player)
 			hit_confirmed.emit()
 
 	_kick_recoil(slot)

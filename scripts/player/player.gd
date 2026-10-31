@@ -8,16 +8,25 @@ extends CharacterBody3D
 
 signal jumped
 signal stepped
+signal health_changed(health: int, max_health: int)
+signal damaged(amount: int, attacker: Node)
+signal died(attacker: Node)
+signal respawned
 
 enum Stance { STANDING, CROUCHING, SLIDING }
 
 const MAX_PITCH := PI / 2.0 - 0.01
+const DEAD_EYE_HEIGHT := 0.4
 
 @export var settings: MovementSettings
+@export var max_health := 100
+@export var respawn_delay := 3.0
 
 var stance := Stance.STANDING
 var yaw := 0.0
 var pitch := 0.0
+var health := 100
+var alive := true
 
 var _slide_elapsed := 0.0
 var _distance_since_step := 0.0
@@ -37,6 +46,43 @@ func _ready() -> void:
 	_eye_height = settings.eye_height
 	_apply_body_height(false)
 	_update_camera()
+
+
+## Places the player at a random `player_spawn` marker with full health. Used for
+## the first spawn and for every respawn.
+func spawn() -> void:
+	var spawns := get_tree().get_nodes_in_group(&"player_spawn")
+	if not spawns.is_empty():
+		var marker := spawns.pick_random() as Node3D
+		teleport(marker.global_position, marker.global_rotation.y)
+	health = max_health
+	alive = true
+	stance = Stance.STANDING
+	_apply_body_height(false)
+	health_changed.emit(health, max_health)
+	respawned.emit()
+
+
+## Called by whatever hurt the player (hitscan today). Ignored while dead.
+func take_damage(amount: int, attacker: Node = null) -> void:
+	if not alive:
+		return
+	health = maxi(health - amount, 0)
+	damaged.emit(amount, attacker)
+	health_changed.emit(health, max_health)
+	if health == 0:
+		_die(attacker)
+
+
+func _die(attacker: Node) -> void:
+	alive = false
+	_slide_elapsed = 0.0
+	if _eye_tween:
+		_eye_tween.kill()
+	_eye_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_eye_tween.tween_property(self, "_eye_height", DEAD_EYE_HEIGHT, settings.eye_ease_time)
+	died.emit(attacker)
+	get_tree().create_timer(respawn_delay).timeout.connect(spawn)
 
 
 func teleport(to: Vector3, new_yaw: float) -> void:
@@ -74,6 +120,15 @@ func _physics_process(delta: float) -> void:
 	var wish_world := Basis(Vector3.UP, yaw) * Vector3(input.x, 0.0, input.y)
 	var wish_dir := Vector2(wish_world.x, wish_world.z).normalized()
 	var grounded := is_on_floor()
+
+	if not alive:
+		# Dead: no control, but still fall and settle.
+		velocity.x = 0.0
+		velocity.z = 0.0
+		if not grounded:
+			velocity += get_gravity() * delta
+		move_and_slide()
+		return
 
 	_update_stance(has_wish, wish_dir, grounded, delta)
 

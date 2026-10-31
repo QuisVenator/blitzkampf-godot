@@ -19,3 +19,4 @@ reload_duration = 2.0
 ads_spread_deg = 0.5
 hip_spread_standing_deg = 4.0
 hip_spread_moving_deg = 6.0
+damage = 50

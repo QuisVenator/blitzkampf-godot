@@ -12,3 +12,4 @@ one_handed = true
 ads_fov = 65.0
 ads_time = 0.12
 ads_sight_distance = 0.35
+damage = 34

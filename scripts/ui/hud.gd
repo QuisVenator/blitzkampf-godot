@@ -18,6 +18,7 @@ var _tick_count := 0
 
 @onready var _crosshair: Crosshair = $Root/Crosshair
 @onready var _hitmarker: Hitmarker = $Root/Hitmarker
+@onready var _health_label: Label = $Root/Info/HealthLabel
 @onready var _hits_label: Label = $Root/Info/HitsLabel
 @onready var _weapon_label: Label = $Root/Info/WeaponLabel
 @onready var _ammo_label: Label = $Root/Info/AmmoLabel
@@ -33,6 +34,8 @@ func bind(player: Player, weapons: WeaponManager) -> void:
 	weapons.reloading_changed.connect(_on_reloading_changed)
 	weapons.spread_changed.connect(_crosshair.set_spread)
 	weapons.hit_confirmed.connect(_on_hit_confirmed)
+	player.health_changed.connect(_on_health_changed)
+	_on_health_changed(player.health, player.max_health)
 
 	for slot_index in 2:
 		var slot := weapons.primary if slot_index == WeaponManager.PRIMARY else weapons.secondary
@@ -78,6 +81,10 @@ func _on_ammo_changed(slot: int, in_mag: int, reserve: int) -> void:
 func _on_reloading_changed(slot: int, reloading: bool) -> void:
 	_reloading[slot] = reloading
 	_update_ammo()
+
+
+func _on_health_changed(health: int, max_health: int) -> void:
+	_health_label.text = "Health: %d / %d" % [health, max_health] if health > 0 else "Dead"
 
 
 func _on_hit_confirmed() -> void:

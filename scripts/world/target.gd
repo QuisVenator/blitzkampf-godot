@@ -21,7 +21,7 @@ func _ready() -> void:
 	_mesh.material_override = _material
 
 
-func take_hit() -> void:
+func take_damage(_amount: int, _attacker: Node = null) -> void:
 	hits += 1
 	if _flash_tween:
 		_flash_tween.kill()

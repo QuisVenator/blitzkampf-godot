@@ -25,7 +25,8 @@ func _run() -> void:
 	await _frames(30)
 	_check("player settles on floor", _player.is_on_floor())
 	_check("player stands at ground level", absf(_player.global_position.y) < 0.05)
-	_check("spawn z", is_equal_approx(_player.global_position.z, 8.0))
+	var spawn_zs := get_nodes_in_group(&"player_spawn").map(func(n: Node3D) -> float: return n.global_position.z)
+	_check("spawned at a player_spawn marker", spawn_zs.any(func(z: float) -> bool: return is_equal_approx(_player.global_position.z, z)))
 
 	# Walking, sprinting (start at the south wall so there is room to run).
 	_player.teleport(Vector3(0, 0, 19), 0.0)
@@ -113,7 +114,7 @@ func _run() -> void:
 	# Walk over to the dropped pistol and take it back: it keeps its ammo.
 	await _frames(90)
 	var landed := dropped[0] as DroppedWeapon
-	_player.teleport(Vector3(landed.global_position.x, 0, landed.global_position.z), 0.0)
+	_player.teleport(landed.global_position + Vector3(0, 0.05, 0), 0.0)
 	await _frames(5)
 	Input.action_press(&"interact")
 	await _frames(2)
@@ -123,6 +124,7 @@ func _run() -> void:
 
 	await _test_akimbo()
 	await _test_pause()
+	await _test_health()
 
 	print("smoke test: %s" % ("OK" if _failures == 0 else "%d FAILED" % _failures))
 	quit(1 if _failures > 0 else 0)
@@ -241,6 +243,29 @@ func _test_pause() -> void:
 	_send_escape()
 	await _frames(2)
 	_check("Esc resumes", not paused and not menu.visible)
+
+
+## Damage, death (drops weapons, no control), respawn with a fresh loadout.
+func _test_health() -> void:
+	_player.respawn_delay = 0.5
+	_player.teleport(Vector3(0, 0, 8), 0.0)
+	_player.take_damage(30, null)
+	_check("damage reduces health", _player.health == 70 and _player.alive)
+	var dropped_before := _dropped_count()
+	_player.take_damage(100, null)
+	_check("dies at zero health", _player.health == 0 and not _player.alive)
+	await _frames(3)
+	_check("dead player drops weapon", _dropped_count() > dropped_before)
+	var dead_at := _player.global_position
+	Input.action_press(&"move_forward")
+	await _frames(15)
+	Input.action_release(&"move_forward")
+	_check("dead player can't move", _player.global_position.distance_to(dead_at) < 0.05)
+	_player.take_damage(10, null)
+	_check("no damage while dead", _player.health == 0)
+	await create_timer(0.7).timeout
+	_check("respawns alive at full health", _player.alive and _player.health == 100)
+	_check("respawn restores starting weapon", _weapons.primary.definition.id == &"pistol" and not _weapons.is_akimbo())
 
 
 func _send_escape() -> void:

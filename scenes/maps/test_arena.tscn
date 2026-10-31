@@ -42,6 +42,9 @@ transform = Transform3D(0.70710677, -0.5773502, 0.4082484, 0, 0.57735044, 0.8164
 [node name="PlayerSpawn" type="Marker3D" parent="." unique_id=601124690 groups=["player_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.9616709, 0.66666067, 8)
 
+[node name="PlayerSpawn2" type="Marker3D" parent="." groups=["player_spawn"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0.66666067, 14)
+
 [node name="Ground" type="CSGBox3D" parent="." unique_id=2028077724]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1, 0)
 use_collision = true

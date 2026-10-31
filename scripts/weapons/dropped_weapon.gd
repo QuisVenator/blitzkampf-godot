@@ -1,7 +1,9 @@
 class_name DroppedWeapon
 extends RigidBody3D
 ## A weapon tossed to the ground. It keeps the ammo it had when dropped and
-## is removed once someone picks it up.
+## is removed once someone picks it up. The body needs continuous collision
+## detection (set in the scene): without it a small thrown box occasionally
+## tunnelled through the floor (about 1 in 10 drops).
 
 ## Keeps thin guns from tunnelling through the floor.
 const MIN_COLLIDER_SIZE := 0.08
