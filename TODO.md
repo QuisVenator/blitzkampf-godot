@@ -16,7 +16,6 @@ Rough order of intent, not a commitment. Tick items off (and move them to Done) 
 ## Later
 - [ ] Health, damage and respawn (foundation for character model, melee and multiplayer)
 - [ ] Player hitbox (together with health/damage)
-- [ ] Character model (rig, animations, third-person body); decide on multiplayer first
 - [ ] Melee weapons (close-range hit shape, swing animations; may need a weapon-slot rethink)
 - [ ] Multiplayer (Godot high-level multiplayer; server-authoritative pickups, ammo, hits, spread)
 - [ ] Real audio, more maps, optional viewmodel `SubViewport`
@@ -29,7 +28,13 @@ Rough order of intent, not a commitment. Tick items off (and move them to Done) 
 - [ ] Reload sound plays once per weapon when akimbo; maybe once
 - [ ] Lighting is dimmer than the three.js original
 
+## Character follow-ups
+- [ ] First-person arms in the viewmodel (instead of the floating gun)
+- [ ] Better animations: strafe/backwards locomotion, slide, reload/shoot/hit reactions, two-handed poses for the shotgun, akimbo arm poses (Universal Animation Library Pro or Universal Base Characters for a nicer mesh)
+- [ ] Footstep/hit-reaction sync, head hitbox (Hit_Head animation exists)
+
 ## Done
+- [x] Third-person character model (Quaternius mannequin) with animation tree, held weapons and replicated held-weapon ids
 - [x] Positional sounds for other players (shots, reloads, pickups, jumps, footsteps)
 - [x] Debug console (F1) with give/damage/heal/kill/tp/bot commands; simple AI bots (`BotInput`); `console` net scenario
 - [x] M4 Smooth feel: `NetSim` lag/loss flags, remote-player interpolation, client prediction + reconciliation (`prediction` net scenario)

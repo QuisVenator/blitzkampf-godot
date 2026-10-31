@@ -20,7 +20,7 @@ const DEAD_EYE_HEIGHT := 0.4
 const BOT_ID_BASE := 1_000_000
 
 # Networking (see the "Networking" section below).
-const SNAPSHOT_SIZE := 11
+const SNAPSHOT_SIZE := 12
 ## Remote players are drawn this far in the past so there is always a newer
 ## snapshot to blend towards.
 const INTERPOLATION_DELAY_MS := 100
@@ -70,14 +70,27 @@ var alive := true:
 			_on_alive_changed()
 
 ## Server state for everyone, published each tick by the server (see `_publish_snapshot`).
-## Layout: [ack sequence, position xyz, velocity xyz, yaw, pitch, stance, slide time].
+## Layout: [ack sequence, position xyz, velocity xyz, yaw, pitch, stance, slide time, on floor].
 var snapshot := PackedFloat32Array():
 	set(value):
 		snapshot = value
 		if not is_multiplayer_authority():
 			_receive_snapshot(value)
 
+## Ids of the weapons in each hand (right, left), replicated so every peer can
+## show them in the character's hands. Set by `WeaponManager` on the server.
+var held_primary := &"":
+	set(value):
+		held_primary = value
+		_show_held_weapons()
+var held_secondary := &"":
+	set(value):
+		held_secondary = value
+		_show_held_weapons()
+
 var _frame := InputFrame.new()
+## Remote players: last replicated "on the floor" flag (their body isn't simulated here).
+var _remote_on_floor := true
 var _snapshot_queue: Array = []  # predicting client: [ready ms, snapshot]
 var _interpolation_buffer: Array = []  # remote player on a client: [ms, position, yaw, pitch]
 var _history: Array = []  # predicting client: [sequence, InputFrame, position after the step]
@@ -92,7 +105,7 @@ var _eye_tween: Tween
 var _capsule: CapsuleShape3D
 
 @onready var input: PlayerInput = $PlayerInput
-@onready var _visual: Node3D = $Visual
+@onready var _visual: CharacterModel = $Visual
 @onready var head: Node3D = $Head
 @onready var camera: Camera3D = $Head/Camera3D
 @onready var interact_area: Area3D = $InteractArea
@@ -107,7 +120,8 @@ func _ready() -> void:
 	input.mouse_sensitivity = settings.mouse_sensitivity
 	_eye_height = settings.eye_height
 	_apply_body_height(false)
-	_visual.visible = not is_local and alive
+	_visual.visible = not is_local
+	_show_held_weapons()
 	if is_local:
 		camera.make_current()
 	else:
@@ -163,7 +177,6 @@ func _die(attacker: Node) -> void:
 ## Dying lowers the camera and hides the stand-in body; coming back restores them.
 ## Runs on every peer, since `alive` is replicated.
 func _on_alive_changed() -> void:
-	_visual.visible = not is_local and alive
 	if alive:
 		_apply_body_height(stance != Stance.STANDING)
 		return
@@ -199,16 +212,13 @@ func _process(delta: float) -> void:
 		_update_camera()
 	if _visual.visible:
 		_visual.global_rotation = Vector3(0.0, yaw, 0.0)
-		_visual.scale.y = 1.0 if stance == Stance.STANDING else _crouch_visual_scale()
+		var grounded := is_on_floor() if is_multiplayer_authority() else _remote_on_floor
+		_visual.update(horizontal_speed(), stance != Stance.STANDING, grounded, alive, pitch)
 
 
 func _update_camera() -> void:
 	var eye_position := get_global_transform_interpolated().origin + Vector3.UP * _eye_height + _error_offset
 	head.global_transform = Transform3D(Basis.from_euler(Vector3(pitch, yaw, 0.0), EULER_ORDER_YXZ), eye_position)
-
-
-func _crouch_visual_scale() -> float:
-	return settings.crouch_height / settings.standing_height
 
 
 func _physics_process(delta: float) -> void:
@@ -385,7 +395,7 @@ func _publish_snapshot() -> void:
 		_frame.sequence,
 		global_position.x, global_position.y, global_position.z,
 		velocity.x, velocity.y, velocity.z,
-		yaw, pitch, stance, _slide_elapsed,
+		yaw, pitch, stance, _slide_elapsed, 1.0 if is_on_floor() else 0.0,
 	])
 
 
@@ -401,7 +411,8 @@ func _receive_snapshot(data: PackedFloat32Array) -> void:
 			_snapshot_queue.pop_front()
 		return
 	stance = int(data[9]) as Stance
-	_interpolation_buffer.append([ready_ms, Vector3(data[1], data[2], data[3]), data[7], data[8]])
+	_remote_on_floor = data[11] > 0.5
+	_interpolation_buffer.append([ready_ms, Vector3(data[1], data[2], data[3]), data[7], data[8], Vector3(data[4], data[5], data[6])])
 	if _interpolation_buffer.size() > MAX_BUFFERED_SNAPSHOTS:
 		_interpolation_buffer.pop_front()
 
@@ -423,6 +434,7 @@ func _interpolate_remote() -> void:
 	global_position = (from[1] as Vector3).lerp(to[1], t)
 	yaw = lerp_angle(from[2], to[2], t)
 	pitch = lerpf(from[3], to[3], t)
+	velocity = (from[4] as Vector3).lerp(to[4], t)
 
 
 ## Predicting client: compares the newest server snapshot with what we predicted
@@ -496,3 +508,10 @@ func _rpc_sound(sound: StringName) -> void:
 		jumped.emit()
 	else:
 		stepped.emit()
+
+
+func _show_held_weapons() -> void:
+	if not is_node_ready():
+		return
+	var catalog := WeaponCatalog.get_default()
+	_visual.set_weapons(catalog.find(held_primary), catalog.find(held_secondary))

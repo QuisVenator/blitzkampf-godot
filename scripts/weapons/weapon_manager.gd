@@ -90,6 +90,7 @@ func _ready() -> void:
 	_player.died.connect(_on_player_died)
 	_player.respawned.connect(_on_player_respawned)
 	if is_multiplayer_authority():
+		weapon_changed.connect(_publish_held_weapons)
 		equip(PRIMARY, starting_weapon)
 		_connect_owner_updates()
 	elif _player.is_local:
@@ -168,6 +169,7 @@ func _on_player_died(_attacker: Node) -> void:
 		return
 	_drop_slot(SECONDARY)
 	_drop_slot(PRIMARY)
+	_player.held_primary = &""
 	_reload_queue.clear()
 
 
@@ -456,6 +458,12 @@ static func spawn_dropped(data: Dictionary, scene: PackedScene) -> DroppedWeapon
 	dropped.linear_velocity = data["velocity"]
 	dropped.angular_velocity = data["spin"]
 	return dropped
+
+
+## Server: tells every peer which weapons this player holds (for the third-person model).
+func _publish_held_weapons(_slot: int, _definition: WeaponDefinition) -> void:
+	_player.held_primary = primary.definition.id if primary.definition else &""
+	_player.held_secondary = secondary.definition.id if secondary.definition else &""
 
 
 # --- Networking -------------------------------------------------------------

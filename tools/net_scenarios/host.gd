@@ -25,7 +25,8 @@ func run_client() -> void:
 	var both := await wait_until(func() -> bool: return players().size() == 2)
 	check("client sees the host's player and its own", both)
 	var host_player := player_of(1)
-	check("host's player is a stand-in here", host_player != null and not host_player.is_local and host_player.get_node("Visual").visible)
+	check("host's player is shown as a character here", host_player != null and not host_player.is_local and host_player.get_node("Visual").visible)
+	check("client sees the weapon in the host's hands", await wait_until(func() -> bool: return host_player.held_primary == &"pistol"))
 	var start := host_player.global_position
 	var saw := await wait_until(func() -> bool: return host_player.global_position.distance_to(start) > 4.0, 15.0)
 	check("client saw the host move", saw)
