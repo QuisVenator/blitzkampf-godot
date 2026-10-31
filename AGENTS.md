@@ -4,7 +4,7 @@ Godot 4.7 re-implementation of the arena-shooter prototype in `../blitzkampf/` (
 
 Open work is tracked in `TODO.md`; update it when finishing or adding tasks.
 
-Status: single-player test arena is playable (movement, 3 weapons, targets, pickups, HUD, placeholder SFX). Not started: multiplayer, more maps, real art/audio.
+Status: single-player test arena is playable (movement, 3 weapons, targets, pickups, HUD, placeholder SFX). Multiplayer: players connect, spawn, move and can shoot each other (server-authoritative, no prediction yet); weapon/ammo state, shot visuals, pickups and drops are not networked yet (see `TODO.md` M3+). Not started: more maps, real art/audio.
 
 ## Stack and project settings
 
@@ -45,6 +45,13 @@ tools/                      smoke_test.gd, generate_placeholder_sfx.gd
 - Sounds are played by name through `Sfx` (`scripts/audio/sfx.gd`); swap sounds by replacing the `.wav` files.
 - Maps are authored in the Godot editor as `.tscn`; there is no JSON map format or custom editor (the Godot editor is the map editor). Place `PlayerSpawn` (group `player_spawn`), targets and `WeaponSpawner` instances (`offers` is an exported array of `WeaponDefinition`).
 
+## Multiplayer
+
+- **Server-authoritative on Godot's high-level multiplayer (ENet)**. Roles: single player (offline peer, same code path), `--host` (listen server, plays too), `--server` (dedicated, headless), `--join=<address>`. `Net` (autoload, `scripts/net/net.gd`) owns the peer, role, CLI parsing (after `--`: `--host`, `--server`, `--join=`, `--port=`, `--scenario=`) and the join handshake with a protocol-version check (`Net.protocol_version`, bump it when the network protocol changes). The entry scene is `scenes/ui/main_menu.tscn`; a CLI role skips it. `Main` calls `Net.start()` and spawns one `Player` per peer with a `MultiplayerSpawner` (`_spawn_player`, node name = peer id).
+- **Authority split**: the `Player` body (and its `WeaponManager`) is simulated only on the server (`is_multiplayer_authority()` guards in `_physics_process`); clients show replicated state (`StateSync` MultiplayerSynchronizer: position, velocity, yaw, pitch, stance, health, alive; setters on `stance`/`health`/`alive` react on clients). Input travels client to server as `InputFrame` packets (`NetInput` sends on the owning client every tick, `RemoteInput` serves them on the server; edge events are running counters so a lost packet loses nothing). `Player.is_local` marks the body this machine's human plays: it gets the camera, HUD and viewmodels; others get the `Visual` stand-in capsule.
+- Never reference the `Net` autoload from scripts that `tools/` scripts type (`Player`, `WeaponManager`, `PlayerInput`...): `-s` scripts compile before autoloads exist. Use Godot's built-in `multiplayer` there.
+- Not networked yet: weapon/ammo state for clients, shot visuals and sounds for others, dropped weapons, spawners, targets, pause behaviour is "mouse released, game keeps running" online. Client-side prediction and interpolation come later (M4).
+
 ## Gameplay decisions carried over (don't relitigate)
 
 - Sprint is just a higher speed cap, no stamina. Walk 7, sprint 11, crouch 3.5 m/s. Jump 7. Holding jump re-jumps on landing.
@@ -64,6 +71,8 @@ tools/                      smoke_test.gd, generate_placeholder_sfx.gd
 - Weapon models are scenes wrapping imported models (currently Quaternius' CC0 Ultimate Gun Pack: pistol = Pistol_2, SMG = SubmachineGun_4, shotgun = Shotgun_3) instead of procedural meshes. The pack's FBXs are ~10x too big and face +X, so each model scene rotates the model 90 degrees about Y and scales it by 0.12 on its `Model` node. `Muzzle` and `Sight` are children of that `Model` node (positions in the model's native units), so the scale is the only number to change to resize a weapon; you may also want to adjust `ads_sight_distance` and the hip pose in `player.tscn`. To swap a model, change the instance in the `*_model.tscn` so the barrel points along -Z, and reposition its `Muzzle` (tracer origin, barrel tip) and `Sight` (rear-sight top; lines up with screen centre when aiming) markers. Model origin should be near the grip, since the viewmodel holder positions the hand. Pickups and dropped weapons re-centre whatever model they show (`ModelBounds`), and the dropped weapon's collider is sized from the model's bounds.
 
 ## Workflow
+
+- Network tests: `godot --headless --path . -s res://tools/net_test.gd [-- scenario ...]` starts a dedicated server (or host) and client processes per scenario in `tools/net_scenarios/` (connect, two_clients, shoot, version_mismatch, host); results and logs land in `user://nettest/`. Add a scenario by subclassing `NetScenario` (`run_server`/`run_client`) and listing it in `net_test.gd`. By hand: `tools/run_local.sh [clients]` opens a host and N client windows (only the focused one gets input). Second machine: same git revision and Godot version, `godot --path . -- --join=<host LAN address>`, UDP port 7777 open. Simulate lag with `sudo tc qdisc add dev lo root netem delay 60ms 10ms loss 2%` (undo: `tc qdisc del dev lo root`).
 
 - Run the game: `godot --path .` (or the Godot MCP `run_project` / `get_debug_output`). Debug overlay: backtick.
 - After adding scripts with `class_name` or new assets, refresh the class cache/imports: `godot --headless --path . --import`. If a GLB was imported before its external texture existed, delete its entries in `.godot/imported/` and import again (touching the file isn't enough).

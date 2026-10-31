@@ -1,7 +1,9 @@
 class_name PauseMenu
 extends CanvasLayer
-## Esc pauses the game (the scene tree) and shows this menu; Esc or Resume
-## continues. Runs while paused (process mode "Always" in the scene).
+## Esc shows this menu and releases the mouse; Esc or Resume continues. In single
+## player it also pauses the scene tree; online the game keeps running for
+## everyone, and a released mouse simply means your player gets no input.
+## Runs while paused (process mode "Always" in the scene).
 
 @onready var _resume: Button = %ResumeButton
 @onready var _resolution: OptionButton = %ResolutionOption
@@ -21,14 +23,14 @@ func _ready() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"ui_cancel"):
 		get_viewport().set_input_as_handled()
-		if get_tree().paused:
+		if visible:
 			resume()
 		else:
 			pause()
 
 
 func pause() -> void:
-	get_tree().paused = true
+	get_tree().paused = not Net.is_online()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	_refresh_options()
 	show()

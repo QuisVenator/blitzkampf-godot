@@ -11,13 +11,14 @@ config_version=5
 [application]
 
 config/name="blitzkampf-godot"
-run/main_scene="res://scenes/main.tscn"
+run/main_scene="res://scenes/ui/main_menu.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
 
 [autoload]
 
 GameSettings="*res://scripts/core/game_settings.gd"
+Net="*res://scripts/net/net.gd"
 
 [display]
 

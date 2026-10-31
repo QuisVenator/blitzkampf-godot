@@ -17,7 +17,7 @@ func _initialize() -> void:
 func _run() -> void:
 	_main = load("res://scenes/main.tscn").instantiate()
 	root.add_child(_main)
-	_player = _main.get_node("Player")
+	_player = _main.local_player
 	_weapons = _player.get_node("WeaponManager")
 	_weapons.hit_confirmed.connect(func() -> void: _hits += 1)
 	GameInput.force_active = true
@@ -108,7 +108,7 @@ func _run() -> void:
 	Input.action_release(&"interact")
 	_check("picked up shotgun", _weapons.primary.definition.id == &"shotgun")
 	await _frames(5)
-	var dropped := _main.get_children().filter(func(n: Node) -> bool: return n is DroppedWeapon)
+	var dropped := _main.get_node("Drops").get_children().filter(func(n: Node) -> bool: return n is DroppedWeapon)
 	_check("old weapon was dropped", dropped.size() == 1)
 
 	# Walk over to the dropped pistol and take it back: it keeps its ammo.
@@ -255,7 +255,9 @@ func _test_bot() -> void:
 	var bot := (load("res://scenes/player/player.tscn") as PackedScene).instantiate() as Player
 	var script := ScriptedInput.new()
 	bot.get_node("PlayerInput").source = script
-	_main.add_child(bot)
+	bot.peer_id = 2
+	bot.is_local = false
+	_main.get_node("Players").add_child(bot)
 	bot.teleport(Vector3(0, 0, 4), 0.0)
 	_player.respawn_delay = 100.0
 	_player.teleport(Vector3(0, 0, -8), 0.0)
@@ -335,12 +337,12 @@ func _press(action: StringName) -> void:
 func _spawn_dropped(definition: WeaponDefinition, mag: int, spare: int) -> void:
 	var dropped := (load("res://scenes/weapons/dropped_weapon.tscn") as PackedScene).instantiate() as DroppedWeapon
 	dropped.setup(definition, mag, spare)
-	_main.add_child(dropped)
+	_main.get_node("Drops").add_child(dropped)
 	dropped.global_position = _player.global_position + Vector3(0, 0.3, 0)
 
 
 func _dropped_count() -> int:
-	return _main.get_children().filter(func(n: Node) -> bool: return n is DroppedWeapon).size()
+	return _main.get_node("Drops").get_children().filter(func(n: Node) -> bool: return n is DroppedWeapon).size()
 
 
 func _frames(count: int) -> void:

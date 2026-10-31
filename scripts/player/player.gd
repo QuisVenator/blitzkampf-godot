@@ -21,11 +21,32 @@ const DEAD_EYE_HEIGHT := 0.4
 @export var max_health := 100
 @export var respawn_delay := 3.0
 
-var stance := Stance.STANDING
+## Which peer controls this player (1 is the host/server and single player).
+var peer_id := 1
+## True on the machine whose human plays this body: it gets the camera, HUD and
+## viewmodels. Everyone else sees a third-person stand-in.
+var is_local := true
+
+# State below is replicated by the StateSync node, so setters react on clients too.
+var stance := Stance.STANDING:
+	set(value):
+		var crouch_changed := (value != Stance.STANDING) != (stance != Stance.STANDING)
+		stance = value
+		if crouch_changed and is_node_ready():
+			_apply_body_height(value != Stance.STANDING)
 var yaw := 0.0
 var pitch := 0.0
-var health := 100
-var alive := true
+var health := 100:
+	set(value):
+		health = value
+		health_changed.emit(health, max_health)
+var alive := true:
+	set(value):
+		if value == alive:
+			return
+		alive = value
+		if is_node_ready():
+			_on_alive_changed()
 
 var _frame := InputFrame.new()
 var _slide_elapsed := 0.0
@@ -35,6 +56,7 @@ var _eye_tween: Tween
 var _capsule: CapsuleShape3D
 
 @onready var input: PlayerInput = $PlayerInput
+@onready var _visual: Node3D = $Visual
 @onready var head: Node3D = $Head
 @onready var camera: Camera3D = $Head/Camera3D
 @onready var interact_area: Area3D = $InteractArea
@@ -47,7 +69,18 @@ func _ready() -> void:
 	input.mouse_sensitivity = settings.mouse_sensitivity
 	_eye_height = settings.eye_height
 	_apply_body_height(false)
+	_visual.visible = not is_local and alive
+	if is_local:
+		camera.make_current()
+	else:
+		camera.clear_current()
+	# Only the simulating side moves the body in physics ticks; elsewhere the
+	# replicated position is applied as it arrives, so don't interpolate it.
+	if not is_multiplayer_authority():
+		physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	_update_camera()
+	if is_multiplayer_authority():
+		spawn()
 
 
 ## Places the player at a random `player_spawn` marker with full health. Used for
@@ -61,7 +94,6 @@ func spawn() -> void:
 	alive = true
 	stance = Stance.STANDING
 	_apply_body_height(false)
-	health_changed.emit(health, max_health)
 	respawned.emit()
 
 
@@ -71,7 +103,6 @@ func take_damage(amount: int, attacker: Node = null) -> void:
 		return
 	health = maxi(health - amount, 0)
 	damaged.emit(amount, attacker)
-	health_changed.emit(health, max_health)
 	if health == 0:
 		_die(attacker)
 
@@ -79,12 +110,21 @@ func take_damage(amount: int, attacker: Node = null) -> void:
 func _die(attacker: Node) -> void:
 	alive = false
 	_slide_elapsed = 0.0
+	died.emit(attacker)
+	get_tree().create_timer(respawn_delay).timeout.connect(spawn)
+
+
+## Dying lowers the camera and hides the stand-in body; coming back restores them.
+## Runs on every peer, since `alive` is replicated.
+func _on_alive_changed() -> void:
+	_visual.visible = not is_local and alive
+	if alive:
+		_apply_body_height(stance != Stance.STANDING)
+		return
 	if _eye_tween:
 		_eye_tween.kill()
 	_eye_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	_eye_tween.tween_property(self, "_eye_height", DEAD_EYE_HEIGHT, settings.eye_ease_time)
-	died.emit(attacker)
-	get_tree().create_timer(respawn_delay).timeout.connect(spawn)
 
 
 func teleport(to: Vector3, new_yaw: float) -> void:
@@ -102,10 +142,15 @@ func horizontal_speed() -> float:
 
 
 func _process(_delta: float) -> void:
-	# The view follows the live look angles, not the tick-sampled frame.
-	yaw = input.look_yaw
-	pitch = input.look_pitch
-	_update_camera()
+	if is_local:
+		# The view follows the live look angles, not the tick-sampled frame.
+		yaw = input.look_yaw
+		pitch = input.look_pitch
+	if is_local or is_multiplayer_authority():
+		_update_camera()
+	if _visual.visible:
+		_visual.global_rotation = Vector3(0.0, yaw, 0.0)
+		_visual.scale.y = 1.0 if stance == Stance.STANDING else _crouch_visual_scale()
 
 
 func _update_camera() -> void:
@@ -113,8 +158,21 @@ func _update_camera() -> void:
 	head.global_transform = Transform3D(Basis.from_euler(Vector3(pitch, yaw, 0.0), EULER_ORDER_YXZ), eye_position)
 
 
+func _crouch_visual_scale() -> float:
+	return settings.crouch_height / settings.standing_height
+
+
 func _physics_process(delta: float) -> void:
+	# Only the server (or single player) simulates; other peers show replicated state.
+	if not is_multiplayer_authority():
+		return
 	_frame = input.frame()
+	if not is_local:
+		# A remote player's body and eyes follow its frame (the live look angles
+		# are the local human's, and only exist on their machine).
+		yaw = _frame.yaw
+		pitch = _frame.pitch
+		_update_camera()
 	var has_wish := _frame.move != Vector2.ZERO
 	var wish_world := Basis(Vector3.UP, _frame.yaw) * Vector3(_frame.move.x, 0.0, _frame.move.y)
 	var wish_dir := Vector2(wish_world.x, wish_world.z).normalized()
@@ -221,11 +279,7 @@ func _start_slide(wish_dir: Vector2) -> void:
 
 
 func _set_stance(new_stance: Stance) -> void:
-	var was_crouched := stance != Stance.STANDING
 	stance = new_stance
-	var crouched := new_stance != Stance.STANDING
-	if crouched != was_crouched:
-		_apply_body_height(crouched)
 
 
 func _apply_body_height(crouched: bool) -> void:

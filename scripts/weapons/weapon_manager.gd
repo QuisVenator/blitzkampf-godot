@@ -71,6 +71,7 @@ func _ready() -> void:
 	secondary = WeaponSlot.new($"../Head/Camera3D/WeaponHolderLeft")
 	_slots = [primary, secondary]
 	equip(PRIMARY, starting_weapon)
+	_show_holders(true)
 	_player.died.connect(_on_player_died)
 	_player.respawned.connect(_on_player_respawned)
 
@@ -111,18 +112,22 @@ func equip(slot_index: int, new_definition: WeaponDefinition, mag := -1, spare :
 	reloading_changed.emit(slot_index, false)
 
 
+## Viewmodels exist only for the human playing this body.
+func _show_holders(shown: bool) -> void:
+	primary.holder.visible = shown and _player.is_local
+	secondary.holder.visible = shown and _player.is_local
+
+
 ## Dying drops everything held; respawning starts over with the starting weapon.
 func _on_player_died(_attacker: Node) -> void:
 	_drop_slot(SECONDARY)
 	_drop_slot(PRIMARY)
 	_reload_queue.clear()
-	primary.holder.hide()
-	secondary.holder.hide()
+	_show_holders(false)
 
 
 func _on_player_respawned() -> void:
-	primary.holder.show()
-	secondary.holder.show()
+	_show_holders(true)
 	_clear(SECONDARY)
 	equip(PRIMARY, starting_weapon)
 
@@ -140,6 +145,9 @@ func _clear(slot_index: int) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	# Only the simulating side (server / single player) runs weapon logic.
+	if not _player.is_multiplayer_authority():
+		return
 	_frame = _player.input.frame()
 	_update_aiming()
 	_update_spread()
@@ -372,7 +380,8 @@ func _drop_slot(slot_index: int) -> void:
 		return
 	var dropped := dropped_weapon_scene.instantiate() as DroppedWeapon
 	dropped.setup(slot.definition, slot.in_mag, slot.reserve)
-	_player.get_parent().add_child(dropped)
+	var container := get_tree().get_first_node_in_group(&"drops")
+	(container if container else _player.get_parent()).add_child(dropped)
 
 	var forward := Vector3(-sin(_player.yaw), 0.0, -cos(_player.yaw))
 	var right := Vector3(cos(_player.yaw), 0.0, -sin(_player.yaw))
