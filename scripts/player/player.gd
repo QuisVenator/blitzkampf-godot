@@ -17,6 +17,20 @@ enum Stance { STANDING, CROUCHING, SLIDING }
 
 const DEAD_EYE_HEIGHT := 0.4
 
+# Networking (see the "Networking" section below).
+const SNAPSHOT_SIZE := 11
+## Remote players are drawn this far in the past so there is always a newer
+## snapshot to blend towards.
+const INTERPOLATION_DELAY_MS := 100
+## The local player's prediction is corrected only when it differs from the server
+## by more than this (metres); beyond SNAP_DISTANCE it is teleported instead.
+const RECONCILE_EPSILON := 0.02
+const RECONCILE_SNAP_DISTANCE := 2.0
+## How fast the visible correction fades out (1/s).
+const ERROR_SMOOTH_RATE := 12.0
+const MAX_HISTORY := 120
+const MAX_BUFFERED_SNAPSHOTS := 40
+
 @export var settings: MovementSettings
 @export var max_health := 100
 @export var respawn_delay := 3.0
@@ -51,7 +65,22 @@ var alive := true:
 		if is_node_ready():
 			_on_alive_changed()
 
+## Server state for everyone, published each tick by the server (see `_publish_snapshot`).
+## Layout: [ack sequence, position xyz, velocity xyz, yaw, pitch, stance, slide time].
+var snapshot := PackedFloat32Array():
+	set(value):
+		snapshot = value
+		if not is_multiplayer_authority():
+			_receive_snapshot(value)
+
 var _frame := InputFrame.new()
+var _snapshot_queue: Array = []  # predicting client: [ready ms, snapshot]
+var _interpolation_buffer: Array = []  # remote player on a client: [ms, position, yaw, pitch]
+var _history: Array = []  # predicting client: [sequence, InputFrame, position after the step]
+var _synced := false
+var _replaying := false
+## Visible correction after a reconcile; fades to zero so the view never jumps.
+var _error_offset := Vector3.ZERO
 var _slide_elapsed := 0.0
 var _distance_since_step := 0.0
 var _eye_height := 0.0
@@ -81,7 +110,7 @@ func _ready() -> void:
 		camera.clear_current()
 	# Only the simulating side moves the body in physics ticks; elsewhere the
 	# replicated position is applied as it arrives, so don't interpolate it.
-	if not is_multiplayer_authority():
+	if not is_multiplayer_authority() and not is_local:
 		physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	_update_camera()
 	if is_multiplayer_authority():
@@ -150,11 +179,14 @@ func horizontal_speed() -> float:
 	return Vector2(velocity.x, velocity.z).length()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if is_local:
 		# The view follows the live look angles, not the tick-sampled frame.
 		yaw = input.look_yaw
 		pitch = input.look_pitch
+		_error_offset = _error_offset.lerp(Vector3.ZERO, 1.0 - exp(-ERROR_SMOOTH_RATE * delta))
+	elif not is_multiplayer_authority():
+		_interpolate_remote()
 	if is_local or is_multiplayer_authority():
 		_update_camera()
 	if _visual.visible:
@@ -163,7 +195,7 @@ func _process(_delta: float) -> void:
 
 
 func _update_camera() -> void:
-	var eye_position := get_global_transform_interpolated().origin + Vector3.UP * _eye_height
+	var eye_position := get_global_transform_interpolated().origin + Vector3.UP * _eye_height + _error_offset
 	head.global_transform = Transform3D(Basis.from_euler(Vector3(pitch, yaw, 0.0), EULER_ORDER_YXZ), eye_position)
 
 
@@ -172,16 +204,33 @@ func _crouch_visual_scale() -> float:
 
 
 func _physics_process(delta: float) -> void:
-	# Only the server (or single player) simulates; other peers show replicated state.
-	if not is_multiplayer_authority():
+	# The server (or single player) simulates authoritatively. The human's own
+	# client predicts the same simulation from its input and is corrected by the
+	# server's snapshots; other peers just show interpolated snapshots.
+	var authority := is_multiplayer_authority()
+	var predicting := is_local and not authority
+	if not authority and not predicting:
 		return
 	_frame = input.frame()
-	if not is_local:
+	if predicting:
+		_reconcile(delta)
+	elif not is_local:
 		# A remote player's body and eyes follow its frame (the live look angles
 		# are the local human's, and only exist on their machine).
 		yaw = _frame.yaw
 		pitch = _frame.pitch
 		_update_camera()
+	_simulate(delta)
+	if predicting:
+		_history.append([_frame.sequence, _frame, global_position])
+		if _history.size() > MAX_HISTORY:
+			_history.pop_front()
+	if authority:
+		_publish_snapshot()
+
+
+## One tick of movement from `_frame`. Also used to replay inputs after a correction.
+func _simulate(delta: float) -> void:
 	var has_wish := _frame.move != Vector2.ZERO
 	var wish_world := Basis(Vector3.UP, _frame.yaw) * Vector3(_frame.move.x, 0.0, _frame.move.y)
 	var wish_dir := Vector2(wish_world.x, wish_world.z).normalized()
@@ -215,7 +264,8 @@ func _physics_process(delta: float) -> void:
 
 	if _frame.jump and grounded:
 		velocity.y = settings.jump_speed
-		jumped.emit()
+		if not _replaying:
+			jumped.emit()
 		if stance == Stance.SLIDING:
 			stance = Stance.CROUCHING
 		# Jumping out of a crouch stands you up unless something is overhead.
@@ -223,7 +273,8 @@ func _physics_process(delta: float) -> void:
 			_set_stance(Stance.STANDING)
 
 	move_and_slide()
-	_track_footsteps(has_wish, delta)
+	if not _replaying:
+		_track_footsteps(has_wish, delta)
 
 
 func _walk_velocity(horizontal: Vector2, has_wish: bool, wish_dir: Vector2, grounded: bool, delta: float) -> Vector2:
@@ -314,3 +365,107 @@ func _track_footsteps(has_wish: bool, delta: float) -> void:
 	if _distance_since_step >= settings.footstep_distance:
 		_distance_since_step = 0.0
 		stepped.emit()
+
+
+# --- Networking -------------------------------------------------------------
+
+## Server: publishes the body's state for all peers (replicated by `StateSync`).
+func _publish_snapshot() -> void:
+	snapshot = PackedFloat32Array([
+		_frame.sequence,
+		global_position.x, global_position.y, global_position.z,
+		velocity.x, velocity.y, velocity.z,
+		yaw, pitch, stance, _slide_elapsed,
+	])
+
+
+## Client: a snapshot arrived (after the simulated lag, if any, for the predicting
+## player; remote players are blended at render time).
+func _receive_snapshot(data: PackedFloat32Array) -> void:
+	if data.size() != SNAPSHOT_SIZE or NetSim.drops():
+		return
+	var ready_ms := Time.get_ticks_msec() + NetSim.lag_ms
+	if is_local:
+		_snapshot_queue.append([ready_ms, data])
+		if _snapshot_queue.size() > MAX_BUFFERED_SNAPSHOTS:
+			_snapshot_queue.pop_front()
+		return
+	stance = int(data[9]) as Stance
+	_interpolation_buffer.append([ready_ms, Vector3(data[1], data[2], data[3]), data[7], data[8]])
+	if _interpolation_buffer.size() > MAX_BUFFERED_SNAPSHOTS:
+		_interpolation_buffer.pop_front()
+
+
+## Remote player on a client: shows the body where it was `INTERPOLATION_DELAY_MS` ago.
+func _interpolate_remote() -> void:
+	if _interpolation_buffer.is_empty():
+		return
+	var render_ms := Time.get_ticks_msec() - INTERPOLATION_DELAY_MS
+	while _interpolation_buffer.size() > 2 and _interpolation_buffer[1][0] <= render_ms:
+		_interpolation_buffer.pop_front()
+	var from: Array = _interpolation_buffer[0]
+	var to: Array = _interpolation_buffer[1] if _interpolation_buffer.size() > 1 else from
+	var span: float = to[0] - from[0]
+	var t := clampf((render_ms - from[0]) / span, 0.0, 1.0) if span > 0.0 else 1.0
+	# A respawn teleports the body; blending across it would streak.
+	if (from[1] as Vector3).distance_to(to[1]) > RECONCILE_SNAP_DISTANCE:
+		t = 1.0 if t > 0.0 else 0.0
+	global_position = (from[1] as Vector3).lerp(to[1], t)
+	yaw = lerp_angle(from[2], to[2], t)
+	pitch = lerpf(from[3], to[3], t)
+
+
+## Predicting client: compares the newest server snapshot with what we predicted
+## for the same input, and replays the inputs the server hasn't seen yet if they differ.
+func _reconcile(delta: float) -> void:
+	var latest := PackedFloat32Array()
+	var now := Time.get_ticks_msec()
+	while not _snapshot_queue.is_empty() and _snapshot_queue[0][0] <= now:
+		latest = _snapshot_queue.pop_front()[1]
+	if latest.is_empty():
+		return
+
+	var ack := int(latest[0])
+	var server_position := Vector3(latest[1], latest[2], latest[3])
+	var server_velocity := Vector3(latest[4], latest[5], latest[6])
+	while not _history.is_empty() and _history[0][0] < ack:
+		_history.pop_front()
+
+	var distance := INF
+	if _synced and not _history.is_empty() and _history[0][0] == ack:
+		distance = server_position.distance_to(_history[0][2])
+		_history.pop_front()
+		if distance < RECONCILE_EPSILON:
+			return
+	elif _synced:
+		return
+
+	if distance > RECONCILE_SNAP_DISTANCE:
+		# First snapshot, respawn or a large error: take the server's word.
+		_synced = true
+		global_position = server_position
+		velocity = server_velocity
+		stance = int(latest[9]) as Stance
+		_slide_elapsed = latest[10]
+		yaw = latest[7]
+		pitch = latest[8]
+		input.set_look(yaw, pitch)
+		_history.clear()
+		_error_offset = Vector3.ZERO
+		reset_physics_interpolation()
+		return
+
+	var predicted_end := global_position
+	global_position = server_position
+	velocity = server_velocity
+	stance = int(latest[9]) as Stance
+	_slide_elapsed = latest[10]
+	var current := _frame
+	_replaying = true
+	for entry in _history:
+		_frame = entry[1]
+		_simulate(delta)
+		entry[2] = global_position
+	_replaying = false
+	_frame = current
+	_error_offset += predicted_end - global_position

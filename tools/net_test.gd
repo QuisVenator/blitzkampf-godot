@@ -12,6 +12,7 @@ const SCENARIOS := [
 	["two_clients", 2, [], ["--server"]],
 	["shoot", 2, [], ["--server"]],
 	["weapons", 1, [], ["--server"]],
+	["prediction", 1, ["--net-lag=80", "--net-loss=3"], ["--server"]],
 	["version_mismatch", 1, ["--protocol=999"], ["--server"]],
 	["host", 1, [], ["--host"]],
 ]

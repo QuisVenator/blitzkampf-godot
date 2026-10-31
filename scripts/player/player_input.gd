@@ -15,6 +15,7 @@ var look_pitch := 0.0
 
 var _frame := InputFrame.new()
 var _frame_tick := -1
+var _sequence := 0
 
 
 ## The frame for this physics tick; sampled once per tick, so every consumer sees
@@ -24,6 +25,10 @@ func frame() -> InputFrame:
 	if tick != _frame_tick:
 		_frame_tick = tick
 		_frame = source.sample(self)
+		_sequence += 1
+		# A network source brings the sender's sequence number; others get ours.
+		if _frame.sequence == 0:
+			_frame.sequence = _sequence
 		look_yaw = _frame.yaw
 		look_pitch = _frame.pitch
 	return _frame

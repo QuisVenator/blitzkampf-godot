@@ -9,7 +9,7 @@ Rough order of intent, not a commitment. Tick items off (and move them to Done) 
 - [ ] Sniper weapons: scope overlay, higher zoom, hidden viewmodel while scoped (new `WeaponDefinition` mode, not a code branch)
 
 ## Multiplayer path (plan: server-authoritative, ENet, listen-server + headless dedicated; see AGENTS.md when it lands)
-- [ ] M4 Smooth feel: lag simulator, remote-player interpolation, client prediction + reconciliation
+- [ ] Lag compensation for hit registration (rewind player positions to the shooter's view time)
 - [ ] M3 leftovers: sounds for other players' shots (positional), kill feed, match end / round limits
 - [ ] M5 Bots: scripted (for tests, early) then AI with navmesh
 
@@ -30,6 +30,7 @@ Rough order of intent, not a commitment. Tick items off (and move them to Done) 
 - [ ] Lighting is dimmer than the three.js original
 
 ## Done
+- [x] M4 Smooth feel: `NetSim` lag/loss flags, remote-player interpolation, client prediction + reconciliation (`prediction` net scenario)
 - [x] M3 Networked combat: weapon/ammo mirror for the owner, shot tracers/impacts for everyone, dropped weapons via spawner, synced pickups/targets, kills/deaths + Tab scoreboard, `weapons` net scenario
 - [x] M2 Connect/spawn/replicate: `Net` autoload + handshake/version check, main menu (single/host/join), spawner, input forwarding, state sync, third-person stand-in bodies, `tools/net_test.gd` (server+clients as processes), `tools/run_local.sh`
 - [x] M1 Input split: `InputFrame` + `PlayerInput` with `LocalInput`/`ScriptedInput` sources, `WeaponCatalog`; a scripted bot player can walk and shoot in the smoke test

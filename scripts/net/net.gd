@@ -5,7 +5,8 @@ extends Node
 ## single player, so gameplay code has no single-player special case.
 ##
 ## Command-line options (after `--`): `--host`, `--server` (dedicated, headless),
-## `--join=<address>`, `--port=<n>`, `--scenario=<name>` (network tests).
+## `--join=<address>`, `--port=<n>`, `--net-lag=<ms>` / `--net-loss=<percent>` (see
+## `NetSim`), `--scenario=<name>` (network tests).
 
 enum Role { OFFLINE, HOST, SERVER, CLIENT }
 
@@ -14,7 +15,7 @@ const MAX_CLIENTS := 8
 const REJECT_GRACE := 0.2
 
 ## A client is accepted only when this matches the server's (builds must agree).
-var protocol_version := 2
+var protocol_version := 3
 
 var role := Role.OFFLINE
 var address := "127.0.0.1"
@@ -42,6 +43,8 @@ func _ready() -> void:
 	port = int(_args.get("port", DEFAULT_PORT))
 	scenario = _args.get("scenario", "")
 	protocol_version = int(_args.get("protocol", protocol_version))
+	NetSim.lag_ms = int(_args.get("net-lag", "0"))
+	NetSim.loss = float(_args.get("net-loss", "0")) / 100.0
 	if _args.has("server"):
 		role = Role.SERVER
 	elif _args.has("host"):

@@ -4,6 +4,10 @@ extends RefCounted
 ## weapons) reads only this, so the source can be the local keyboard and mouse,
 ## a script or bot, or later the network.
 
+## Counts the frames of one player, so the server can tell a client which of its
+## inputs it has processed (client prediction). Stamped by `PlayerInput`.
+var sequence := 0
+
 ## Move intent: x = right, y = back (same axes as `Input.get_vector`).
 var move := Vector2.ZERO
 ## View angles in radians.
