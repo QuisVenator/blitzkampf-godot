@@ -68,7 +68,9 @@ var _capsule: CapsuleShape3D
 
 
 func _ready() -> void:
-	_capsule = _collision_shape.shape as CapsuleShape3D
+	# Each player resizes its own capsule when crouching; the scene resource is shared.
+	_capsule = (_collision_shape.shape as CapsuleShape3D).duplicate()
+	_collision_shape.shape = _capsule
 	input.mouse_sensitivity = settings.mouse_sensitivity
 	_eye_height = settings.eye_height
 	_apply_body_height(false)
