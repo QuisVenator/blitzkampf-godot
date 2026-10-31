@@ -10,9 +10,13 @@ const DROPPED_WEAPON_SCENE := preload("res://scenes/weapons/dropped_weapon.tscn"
 ## The player this machine's human controls (null on a dedicated server).
 var local_player: Player
 
+var _next_bot_id := Player.BOT_ID_BASE
+var _commands := DebugCommands.new()
+
 @onready var _players: Node3D = $Players
 @onready var _spawner: MultiplayerSpawner = $PlayerSpawner
 @onready var _drop_spawner: MultiplayerSpawner = $DropSpawner
+@onready var _console: DebugConsole = $DebugConsole
 @onready var _hud: Hud = $Hud
 @onready var _sfx: Sfx = $Sfx
 
@@ -21,6 +25,7 @@ func _ready() -> void:
 	_spawner.spawn_function = _spawn_player
 	_drop_spawner.spawn_function = WeaponManager.spawn_dropped.bind(DROPPED_WEAPON_SCENE)
 	_players.child_entered_tree.connect(_on_player_entered)
+	_console.command_submitted.connect(submit_command)
 	Net.connection_lost.connect(_return_to_menu)
 
 	if Net.start() != OK:
@@ -43,10 +48,68 @@ func _spawn_player(data: Dictionary) -> Node:
 	player.name = str(peer)
 	player.peer_id = peer
 	player.is_local = peer == multiplayer.get_unique_id()
+	player.is_bot = data.get("bot", false)
+	if player.is_bot and multiplayer.is_server():
+		player.get_node("PlayerInput").source = BotInput.new()
 	# The player body belongs to the server; each owner's client sends it input.
 	player.get_node("PlayerInput").set_multiplayer_authority(peer)
 	player.get_node("NetInput").set_multiplayer_authority(peer)
 	return player
+
+
+## Server: adds an AI player.
+func spawn_bot() -> Player:
+	_next_bot_id += 1
+	return _spawner.spawn({"peer": _next_bot_id, "bot": true}) as Player
+
+
+## Server: removes every bot; returns how many.
+func clear_bots() -> int:
+	var removed := 0
+	for player in players():
+		if player.is_bot:
+			player.queue_free()
+			removed += 1
+	return removed
+
+
+func players() -> Array[Player]:
+	var result: Array[Player] = []
+	for child in _players.get_children():
+		if child is Player and not child.is_queued_for_deletion():
+			result.append(child)
+	return result
+
+
+## Runs a console line on the server (here, if this is the server) and prints the reply.
+func submit_command(line: String) -> void:
+	if multiplayer.is_server():
+		_execute_command(line, multiplayer.get_unique_id())
+	else:
+		_rpc_command.rpc_id(1, line)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_command(line: String) -> void:
+	_execute_command(line, multiplayer.get_remote_sender_id())
+
+
+func _execute_command(line: String, sender: int) -> void:
+	var own := sender == multiplayer.get_unique_id()
+	var output := ""
+	if not own and not Net.cheats:
+		output = "Console commands from clients are disabled on this server (it needs --cheats)"
+	else:
+		output = _commands.run(self, _players.get_node_or_null(str(sender)) as Player, line)
+	if own:
+		_console.print_line(output)
+	else:
+		_rpc_output.rpc_id(sender, output)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _rpc_output(text: String) -> void:
+	_console.print_line(text)
 
 
 func _on_peer_joined(peer: int) -> void:

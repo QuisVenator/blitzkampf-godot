@@ -16,6 +16,8 @@ signal respawned
 enum Stance { STANDING, CROUCHING, SLIDING }
 
 const DEAD_EYE_HEIGHT := 0.4
+## Bots get ids above this so they never collide with a real peer id.
+const BOT_ID_BASE := 1_000_000
 
 # Networking (see the "Networking" section below).
 const SNAPSHOT_SIZE := 11
@@ -37,6 +39,8 @@ const MAX_BUFFERED_SNAPSHOTS := 40
 
 ## Which peer controls this player (1 is the host/server and single player).
 var peer_id := 1
+## Server-driven AI player (no peer behind it); `peer_id` is just a unique id then.
+var is_bot := false
 ## True on the machine whose human plays this body: it gets the camera, HUD and
 ## viewmodels. Everyone else sees a third-person stand-in.
 var is_local := true
@@ -115,6 +119,10 @@ func _ready() -> void:
 	_update_camera()
 	if is_multiplayer_authority():
 		spawn()
+
+
+func display_name() -> String:
+	return "Bot %d" % (peer_id - BOT_ID_BASE) if is_bot else "Player %d" % peer_id
 
 
 ## Places the player at a random `player_spawn` marker with full health. Used for

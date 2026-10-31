@@ -129,6 +129,29 @@ func equip(slot_index: int, new_definition: WeaponDefinition, mag := -1, spare :
 	reloading_changed.emit(slot_index, false)
 
 
+## Debug/console: puts a fresh weapon into a slot without dropping what was there.
+## Returns an error message, or "" on success.
+func give(slot_index: int, definition: WeaponDefinition) -> String:
+	if slot_index == SECONDARY:
+		if not definition.one_handed:
+			return "%s is two-handed; it only fits the primary slot" % definition.display_name
+		if primary.is_empty() or not primary.definition.one_handed:
+			return "The primary weapon must be one-handed to hold a second one"
+	elif not definition.one_handed:
+		_clear(SECONDARY)
+	equip(slot_index, definition)
+	return ""
+
+
+## Debug/console: refills every held weapon's magazine and reserve.
+func refill() -> void:
+	for slot_index in 2:
+		var slot := _slots[slot_index]
+		if slot.is_empty():
+			continue
+		equip(slot_index, slot.definition)
+
+
 ## Viewmodels exist only for the human playing this body.
 func _show_holders(shown: bool) -> void:
 	primary.holder.visible = shown and _player.is_local

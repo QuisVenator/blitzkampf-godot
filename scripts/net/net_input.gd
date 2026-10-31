@@ -19,7 +19,7 @@ func _ready() -> void:
 	if multiplayer.multiplayer_peer is OfflineMultiplayerPeer:
 		return
 	if multiplayer.is_server():
-		if _player.peer_id != multiplayer.get_unique_id():
+		if _player.peer_id != multiplayer.get_unique_id() and not _player.is_bot:
 			_remote = RemoteInput.new()
 			_input.source = _remote
 	elif _player.is_local:

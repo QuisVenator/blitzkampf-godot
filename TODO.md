@@ -11,7 +11,7 @@ Rough order of intent, not a commitment. Tick items off (and move them to Done) 
 ## Multiplayer path (plan: server-authoritative, ENet, listen-server + headless dedicated; see AGENTS.md when it lands)
 - [ ] Lag compensation for hit registration (rewind player positions to the shooter's view time)
 - [ ] M3 leftovers: sounds for other players' shots (positional), kill feed, match end / round limits
-- [ ] M5 Bots: scripted (for tests, early) then AI with navmesh
+- [ ] Better bots: navigation mesh pathing, pick up weapons, difficulty levels, bot names/count in the menu
 
 ## Later
 - [ ] Health, damage and respawn (foundation for character model, melee and multiplayer)
@@ -30,6 +30,7 @@ Rough order of intent, not a commitment. Tick items off (and move them to Done) 
 - [ ] Lighting is dimmer than the three.js original
 
 ## Done
+- [x] Debug console (F1) with give/damage/heal/kill/tp/bot commands; simple AI bots (`BotInput`); `console` net scenario
 - [x] M4 Smooth feel: `NetSim` lag/loss flags, remote-player interpolation, client prediction + reconciliation (`prediction` net scenario)
 - [x] M3 Networked combat: weapon/ammo mirror for the owner, shot tracers/impacts for everyone, dropped weapons via spawner, synced pickups/targets, kills/deaths + Tab scoreboard, `weapons` net scenario
 - [x] M2 Connect/spawn/replicate: `Net` autoload + handshake/version check, main menu (single/host/join), spawner, input forwarding, state sync, third-person stand-in bodies, `tools/net_test.gd` (server+clients as processes), `tools/run_local.sh`

@@ -33,6 +33,6 @@ func _refresh() -> void:
 	rows.sort_custom(func(a: Player, b: Player) -> bool: return a.kills > b.kills or (a.kills == b.kills and a.deaths < b.deaths))
 	var lines := ["%-14s %6s %7s" % ["Player", "Kills", "Deaths"]]
 	for player in rows:
-		var label := "Player %d" % player.peer_id
+		var label := player.display_name()
 		lines.append("%-14s %6d %7d" % [label + (" (you)" if player.is_local else ""), player.kills, player.deaths])
 	_table.text = "\n".join(lines)

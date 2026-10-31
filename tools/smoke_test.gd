@@ -126,9 +126,34 @@ func _run() -> void:
 	await _test_pause()
 	await _test_bot()
 	await _test_health()
+	await _test_console()
 
 	print("smoke test: %s" % ("OK" if _failures == 0 else "%d FAILED" % _failures))
 	quit(1 if _failures > 0 else 0)
+
+
+## Console commands run offline through the same path as on a server.
+func _test_console() -> void:
+	var commands := DebugCommands.new()
+	commands.run(_main, _player, "give shotgun")
+	_check("console: give shotgun", _weapons.primary.definition.id == &"shotgun" and not _weapons.is_akimbo())
+	commands.run(_main, _player, "give pistol")
+	commands.run(_main, _player, "give smg secondary")
+	_check("console: give secondary", _weapons.is_akimbo())
+	_check("console: two-handed can't go secondary", commands.run(_main, _player, "give shotgun secondary").contains("two-handed"))
+	commands.run(_main, _player, "damage 40")
+	_check("console: damage", _player.health == _player.max_health - 40)
+	commands.run(_main, _player, "heal")
+	_check("console: heal", _player.health == _player.max_health)
+	_check("console: unknown command", commands.run(_main, _player, "nonsense").begins_with("Unknown"))
+	var before: int = _main.players().size()
+	commands.run(_main, _player, "bot 2")
+	await _frames(3)
+	_check("console: bots added", _main.players().size() == before + 2)
+	await _frames(120)
+	commands.run(_main, _player, "botclear")
+	await _frames(3)
+	_check("console: bots removed", _main.players().size() == before)
 
 
 ## Akimbo: pairing one-handed weapons, per-hand firing, F/G replacement, two-handed pickups.
