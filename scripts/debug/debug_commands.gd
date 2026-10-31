@@ -21,6 +21,7 @@ const _HELP := {
 	"tp": ["tp <x> <y> <z> [target]", "teleport"],
 	"bot": ["bot [count]", "add AI bots"],
 	"botclear": ["botclear", "remove all bots"],
+	"botmode": ["botmode auto|idle|wander|fight", "how bots behave: auto mixes standing/walking and bursts/pauses; idle stands still, never shoots; wander walks, never shoots; fight always shoots"],
 }
 
 var _main: Node
@@ -129,6 +130,14 @@ func _cmd_bot(args: Array) -> String:
 	for i in count:
 		_main.spawn_bot()
 	return "Added %d bot(s)" % count
+
+
+func _cmd_botmode(args: Array) -> String:
+	var modes := {"auto": BotInput.Mode.AUTO, "idle": BotInput.Mode.IDLE, "wander": BotInput.Mode.WANDER, "fight": BotInput.Mode.FIGHT}
+	if args.is_empty() or not modes.has(args[0]):
+		return "Usage: %s (now: %s)" % [_HELP["botmode"][0], BotInput.Mode.keys()[BotInput.mode].to_lower()]
+	BotInput.mode = modes[args[0]]
+	return "Bots now: " + args[0]
 
 
 func _cmd_botclear(_args: Array) -> String:

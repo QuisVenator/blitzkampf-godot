@@ -3,6 +3,16 @@ extends InputSource
 ## A simple AI that plays a `Player`: wanders, turns away from walls, and shoots at
 ## the nearest enemy it can see. No navigation mesh yet, so it is a sparring
 ## partner for testing rather than a real opponent. Runs on the server only.
+##
+## Behaviour varies on purpose: bots stand still from time to time and shoot in
+## bursts with pauses, so a human tester gets quiet moments. `mode` (console
+## command `botmode`) overrides that for all bots.
+
+enum Mode { AUTO, IDLE, WANDER, FIGHT }
+
+## IDLE: stand still, never shoot. WANDER: keep moving, never shoot. FIGHT: always
+## moving and shooting what they see. AUTO: a mix of everything.
+static var mode := Mode.AUTO
 
 const SIGHT_MASK := 1 << 0
 const FIRE_RANGE := 40.0
@@ -15,6 +25,13 @@ const WALL_PROBE := 2.0
 const TARGET_CHEST := 1.2
 const STRAFE_INTERVAL := 1.3
 const WANDER_TURN_INTERVAL := 3.0
+## Seconds spent walking / standing still, and firing / holding fire, in AUTO.
+const MOVE_TIME := Vector2(3.0, 8.0)
+const STAND_TIME := Vector2(1.5, 5.0)
+const BURST_TIME := Vector2(0.5, 2.0)
+const PAUSE_TIME := Vector2(1.0, 4.0)
+## Delay before shooting at an enemy that just came into view.
+const REACTION_TIME := Vector2(0.3, 0.9)
 
 var _yaw := 0.0
 var _pitch := 0.0
@@ -25,6 +42,12 @@ var _strafe_timer := 0.0
 var _wander_timer := 0.0
 var _wander_yaw := 0.0
 var _initialised := false
+var _standing := false
+var _phase_timer := 0.0
+var _bursting := true
+var _burst_timer := 0.0
+var _reaction_left := 0.0
+var _had_target := false
 
 
 func sample(input: PlayerInput) -> InputFrame:
@@ -50,6 +73,7 @@ func sample(input: PlayerInput) -> InputFrame:
 		_strafe_timer = STRAFE_INTERVAL * randf_range(0.6, 1.4)
 		_strafe = -_strafe
 
+	_update_phases(delta)
 	var target := _nearest_enemy(player)
 	var desired_yaw := _wander_yaw
 	var desired_pitch := 0.0
@@ -77,15 +101,53 @@ func sample(input: PlayerInput) -> InputFrame:
 	frame.yaw = _yaw
 	frame.pitch = _pitch
 
-	# Always advance; strafe too while an enemy is in sight.
-	frame.move = Vector2(_strafe if visible_target else 0.0, -1.0 if not visible_target else -0.3)
-	if visible_target:
+	# Walk (strafing while an enemy is in sight) unless standing around.
+	if not _is_standing():
+		frame.move = Vector2(_strafe if visible_target else 0.0, -1.0 if not visible_target else -0.3)
+
+	if visible_target and not _had_target:
+		_reaction_left = randf_range(REACTION_TIME.x, REACTION_TIME.y)
+	_had_target = visible_target
+	_reaction_left -= delta
+	if visible_target and _may_fire() and _reaction_left <= 0.0:
 		var aimed := absf(angle_difference(_yaw, desired_yaw)) < FIRE_ANGLE
 		frame.fire = aimed and player.head.global_position.distance_to(_chest(target)) < FIRE_RANGE
 		frame.fire_secondary = frame.fire
 	if weapons.primary.in_mag == 0 or (not visible_target and weapons.primary.in_mag < weapons.primary.definition.magazine_size):
 		frame.reload_pressed = true
 	return frame
+
+
+## AUTO: alternates walking and standing, and firing bursts and pauses.
+func _update_phases(delta: float) -> void:
+	_phase_timer -= delta
+	if _phase_timer <= 0.0:
+		_standing = not _standing
+		var span := STAND_TIME if _standing else MOVE_TIME
+		_phase_timer = randf_range(span.x, span.y)
+	_burst_timer -= delta
+	if _burst_timer <= 0.0:
+		_bursting = not _bursting
+		var span := BURST_TIME if _bursting else PAUSE_TIME
+		_burst_timer = randf_range(span.x, span.y)
+
+
+func _is_standing() -> bool:
+	match mode:
+		Mode.IDLE:
+			return true
+		Mode.AUTO:
+			return _standing
+	return false
+
+
+func _may_fire() -> bool:
+	match mode:
+		Mode.IDLE, Mode.WANDER:
+			return false
+		Mode.AUTO:
+			return _bursting
+	return true
 
 
 func _nearest_enemy(player: Player) -> Player:

@@ -24,6 +24,7 @@ func run_client() -> void:
 	main.submit_command("heal")
 	check("heal restores health", await wait_until(func() -> bool: return me.health == 100))
 
+	main.submit_command("botmode fight")
 	main.submit_command("bot")
 	var bot_there := await wait_until(func() -> bool: return players().size() == 2)
 	check("client sees the bot", bot_there)
