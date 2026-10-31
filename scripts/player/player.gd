@@ -274,6 +274,7 @@ func _simulate(delta: float) -> void:
 		velocity.y = settings.jump_speed
 		if not _replaying:
 			jumped.emit()
+			_broadcast_sound(&"jump")
 		if stance == Stance.SLIDING:
 			stance = Stance.CROUCHING
 		# Jumping out of a crouch stands you up unless something is overhead.
@@ -373,6 +374,7 @@ func _track_footsteps(has_wish: bool, delta: float) -> void:
 	if _distance_since_step >= settings.footstep_distance:
 		_distance_since_step = 0.0
 		stepped.emit()
+		_broadcast_sound(&"footstep")
 
 
 # --- Networking -------------------------------------------------------------
@@ -477,3 +479,20 @@ func _reconcile(delta: float) -> void:
 	_replaying = false
 	_frame = current
 	_error_offset += predicted_end - global_position
+
+
+## Server: lets every other peer hear this player's jump or step; their copy of
+## the body doesn't simulate, so it can't emit `jumped`/`stepped` itself.
+func _broadcast_sound(sound: StringName) -> void:
+	if is_multiplayer_authority():
+		_rpc_sound.rpc(sound)
+
+
+@rpc("authority", "call_remote", "unreliable")
+func _rpc_sound(sound: StringName) -> void:
+	if is_local:
+		return
+	if sound == &"jump":
+		jumped.emit()
+	else:
+		stepped.emit()

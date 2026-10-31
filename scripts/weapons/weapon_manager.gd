@@ -26,6 +26,9 @@ signal fired(definition: WeaponDefinition)
 signal reload_started(definition: WeaponDefinition)
 signal hit_confirmed
 signal picked_up
+## A sound made by *another* player's weapon, to be played at `position` (the
+## owner hears their own through the signals above). Emitted on every peer.
+signal heard(sound: StringName, position: Vector3, pitch: float)
 
 const PRIMARY := 0
 const SECONDARY := 1
@@ -291,12 +294,13 @@ func _fire(slot: WeaponSlot) -> void:
 	if muzzle_marker:
 		muzzle = muzzle_marker.global_position
 
+	var id := slot.definition.id
 	if hit.is_empty():
-		_show_shot(muzzle, origin + direction * MAX_RANGE, Vector3.ZERO)
-		_rpc_shot.rpc(muzzle, origin + direction * MAX_RANGE, Vector3.ZERO)
+		_show_shot(id, muzzle, origin + direction * MAX_RANGE, Vector3.ZERO)
+		_rpc_shot.rpc(id, muzzle, origin + direction * MAX_RANGE, Vector3.ZERO)
 	else:
-		_show_shot(muzzle, hit["position"], hit["normal"])
-		_rpc_shot.rpc(muzzle, hit["position"], hit["normal"])
+		_show_shot(id, muzzle, hit["position"], hit["normal"])
+		_rpc_shot.rpc(id, muzzle, hit["position"], hit["normal"])
 		var collider: Object = hit["collider"]
 		if collider.has_method(&"take_damage"):
 			collider.take_damage(slot.definition.damage, _player)
@@ -355,6 +359,7 @@ func _advance_reload_queue() -> void:
 		slot.reload_left = slot.definition.reload_duration
 		reloading_changed.emit(slot_index, true)
 		reload_started.emit(slot.definition)
+		_announce(&"reload")
 		return
 
 
@@ -402,6 +407,7 @@ func _try_pickup(replace_primary: bool) -> void:
 	equip(target, incoming, best.ammo_in_mag, best.ammo_reserve)
 	best.collect()
 	picked_up.emit()
+	_announce(&"pickup")
 
 
 func _find_pickup() -> PickupArea:
@@ -502,16 +508,34 @@ func _connect_owner_updates() -> void:
 			_rpc_event.rpc_id(peer, EVENT_PICKED_UP))
 
 
-func _show_shot(from: Vector3, to: Vector3, normal: Vector3) -> void:
+func _show_shot(id: StringName, from: Vector3, to: Vector3, normal: Vector3) -> void:
 	_effects.spawn_tracer(from, to)
 	if normal != Vector3.ZERO:
 		_effects.spawn_impact(to, normal)
+	if not _player.is_local:
+		var definition := WeaponCatalog.get_default().find(id)
+		heard.emit(&"fire", from, definition.fire_pitch_scale if definition else 1.0)
 
 
-## Everyone but the server: a bullet's tracer and impact (zero normal = no hit).
+## Everyone but the server: a bullet's tracer and impact (zero normal = no hit),
+## and the shot's sound for players other than the shooter.
 @rpc("authority", "call_remote", "unreliable")
-func _rpc_shot(from: Vector3, to: Vector3, normal: Vector3) -> void:
-	_show_shot(from, to, normal)
+func _rpc_shot(id: StringName, from: Vector3, to: Vector3, normal: Vector3) -> void:
+	_show_shot(id, from, to, normal)
+
+
+## Server: other players hear this too (reloads, pickups).
+func _announce(sound: StringName) -> void:
+	var position := _camera.global_position
+	if not _player.is_local:
+		heard.emit(sound, position, 1.0)
+	_rpc_heard.rpc(sound, position)
+
+
+@rpc("authority", "call_remote", "unreliable")
+func _rpc_heard(sound: StringName, position: Vector3) -> void:
+	if not _player.is_local:
+		heard.emit(sound, position, 1.0)
 
 
 ## A freshly spawned local player asks the server for its whole weapon state,

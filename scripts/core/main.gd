@@ -124,7 +124,10 @@ func _on_peer_left(peer: int) -> void:
 
 func _on_player_entered(node: Node) -> void:
 	var player := node as Player
-	if player == null or not player.is_local:
+	if player == null:
+		return
+	if not player.is_local:
+		_hear_player(player)
 		return
 	local_player = player
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -137,6 +140,15 @@ func _on_player_entered(node: Node) -> void:
 	weapons.hit_confirmed.connect(_sfx.play.bind(&"hit"))
 	weapons.reload_started.connect(func(_definition: WeaponDefinition) -> void: _sfx.play(&"reload"))
 	weapons.picked_up.connect(_sfx.play.bind(&"pickup"))
+
+
+## Another player's jumps, steps, shots and reloads are heard from where they happen.
+func _hear_player(player: Player) -> void:
+	player.jumped.connect(func() -> void: _sfx.play_at(&"jump", player.global_position))
+	player.stepped.connect(func() -> void: _sfx.play_at(&"footstep", player.global_position))
+	await player.ready
+	var weapons := player.get_node("WeaponManager") as WeaponManager
+	weapons.heard.connect(_sfx.play_at)
 
 
 ## A window that starts unfocused (a second local instance, alt-tab) can't grab the

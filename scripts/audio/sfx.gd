@@ -12,6 +12,9 @@ const STREAMS := {
 	&"reload": preload("res://audio/sfx/reload.wav"),
 }
 const POLYPHONY := 4
+## Positional sounds: loudness falls off from this distance (m), silent beyond the max.
+const SPATIAL_UNIT_SIZE := 6.0
+const SPATIAL_MAX_DISTANCE := 80.0
 
 var _players: Dictionary[StringName, AudioStreamPlayer] = {}
 
@@ -28,4 +31,18 @@ func _ready() -> void:
 func play(sound_name: StringName, pitch_scale := 1.0) -> void:
 	var player := _players[sound_name]
 	player.pitch_scale = pitch_scale
+	player.play()
+
+
+## A sound in the world (another player's shot, footstep...). Frees itself when done.
+func play_at(sound_name: StringName, position: Vector3, pitch_scale := 1.0) -> void:
+	var player := AudioStreamPlayer3D.new()
+	player.stream = STREAMS[sound_name]
+	player.pitch_scale = pitch_scale
+	player.top_level = true
+	player.unit_size = SPATIAL_UNIT_SIZE
+	player.max_distance = SPATIAL_MAX_DISTANCE
+	add_child(player)
+	player.global_position = position
+	player.finished.connect(player.queue_free)
 	player.play()

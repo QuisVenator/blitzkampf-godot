@@ -33,7 +33,11 @@ func run_client() -> void:
 		await wait_seconds(3.0)
 		scripted.frame.fire = false
 	else:
+		var shooter: Player = players().filter(func(p: Player) -> bool: return not p.is_local)[0]
+		var heard: Array[StringName] = []
+		(shooter.get_node("WeaponManager") as WeaponManager).heard.connect(func(sound: StringName, _at: Vector3, _pitch: float) -> void: heard.append(sound))
 		var damaged := await wait_until(func() -> bool: return me.health < 100, 15.0)
+		check("victim client hears the shooter's gunshots", await wait_until(func() -> bool: return &"fire" in heard))
 		check("victim client sees its replicated health drop", damaged)
 		var dead := await wait_until(func() -> bool: return not me.alive, 15.0)
 		check("victim client sees itself dead", dead)
