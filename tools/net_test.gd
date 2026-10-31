@@ -16,6 +16,7 @@ const SCENARIOS := [
 	["console", 1, [], ["--server", "--cheats"]],
 	["version_mismatch", 1, ["--protocol=999"], ["--server"]],
 	["host", 1, [], ["--host"]],
+	["realinput", 1, [], ["--host"]],
 ]
 const CLIENT_START_DELAY := 1.5
 const PROCESS_TIMEOUT := 60.0

@@ -196,6 +196,8 @@ func _clear(slot_index: int) -> void:
 func _physics_process(delta: float) -> void:
 	# Only the simulating side (server / single player) runs weapon logic.
 	if not _player.is_multiplayer_authority():
+		if _player.is_local:
+			_predict_feedback(delta)
 		return
 	_frame = _player.input.frame()
 	_update_aiming()
@@ -212,6 +214,27 @@ func _physics_process(delta: float) -> void:
 
 	_tick_slot(PRIMARY, _frame.fire, delta)
 	_tick_slot(SECONDARY, _frame.fire_secondary, delta)
+
+
+## Predicting client: shows aiming, recoil and the shot sound at once instead of
+## waiting a round trip for the server. Only feedback is predicted; ammo, damage,
+## tracers and impacts still come from the server, and the server's aiming and
+## "fired" messages are ignored here (see `_rpc_aiming`, `_rpc_fired`).
+func _predict_feedback(delta: float) -> void:
+	_frame = _player.input.frame()
+	_update_aiming()
+	if not _player.alive:
+		return
+	for slot_index in 2:
+		var slot := _slots[slot_index]
+		if slot.is_empty() or slot.reload_left > 0.0:
+			continue
+		slot.cooldown -= delta
+		var firing := _frame.fire if slot_index == PRIMARY else _frame.fire_secondary
+		if firing and not is_reloading() and slot.cooldown <= COOLDOWN_EPSILON and slot.in_mag > 0:
+			slot.cooldown = slot.definition.fire_cooldown
+			_kick_recoil(slot)
+			fired.emit(slot.definition)
 
 
 func _tick_slot(slot_index: int, firing: bool, delta: float) -> void:
@@ -598,7 +621,9 @@ func _rpc_reload_started(id: StringName) -> void:
 
 @rpc("authority", "call_remote", "reliable")
 func _rpc_aiming(aiming: bool) -> void:
-	if aiming == _aiming:
+	# The human's own client decides this from its input (`_predict_feedback`); a
+	# late echo of an earlier state would make the sights flicker.
+	if _player.is_local or aiming == _aiming:
 		return
 	_aiming = aiming
 	_move_to_pose(aiming)
@@ -613,6 +638,8 @@ func _rpc_spread(degrees: float) -> void:
 
 @rpc("authority", "call_remote", "unreliable")
 func _rpc_fired(id: StringName, slot_index: int) -> void:
+	if _player.is_local:
+		return  # already shown when the trigger was pulled (`_predict_feedback`)
 	var slot := _slots[slot_index]
 	if slot.viewmodel:
 		_kick_recoil(slot)
