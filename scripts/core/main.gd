@@ -5,18 +5,21 @@ extends Node3D
 ## `MultiplayerSpawner`, and wires the local player's signals to the HUD and sounds.
 
 const MENU_SCENE := "res://scenes/ui/main_menu.tscn"
+const DROPPED_WEAPON_SCENE := preload("res://scenes/weapons/dropped_weapon.tscn")
 
 ## The player this machine's human controls (null on a dedicated server).
 var local_player: Player
 
 @onready var _players: Node3D = $Players
 @onready var _spawner: MultiplayerSpawner = $PlayerSpawner
+@onready var _drop_spawner: MultiplayerSpawner = $DropSpawner
 @onready var _hud: Hud = $Hud
 @onready var _sfx: Sfx = $Sfx
 
 
 func _ready() -> void:
 	_spawner.spawn_function = _spawn_player
+	_drop_spawner.spawn_function = WeaponManager.spawn_dropped.bind(DROPPED_WEAPON_SCENE)
 	_players.child_entered_tree.connect(_on_player_entered)
 	Net.connection_lost.connect(_return_to_menu)
 

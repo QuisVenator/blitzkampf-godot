@@ -5,6 +5,7 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="4_hud"]
 [ext_resource type="Script" uid="uid://chvndphg3s0im" path="res://scripts/audio/sfx.gd" id="5_sfx"]
 [ext_resource type="PackedScene" path="res://scenes/ui/pause_menu.tscn" id="6_pause"]
+[ext_resource type="PackedScene" path="res://scenes/ui/scoreboard.tscn" id="7_scoreboard"]
 
 [node name="Main" type="Node3D"]
 script = ExtResource("1_main")
@@ -17,7 +18,14 @@ script = ExtResource("1_main")
 _spawnable_scenes = PackedStringArray()
 spawn_path = NodePath("../Players")
 
+[node name="DropSpawner" type="MultiplayerSpawner" parent="." groups=["drop_spawner"]]
+_spawnable_scenes = PackedStringArray()
+spawn_path = NodePath("../Drops")
+
 [node name="Drops" type="Node3D" parent="." groups=["drops"]]
+
+[node name="Scoreboard" parent="." instance=ExtResource("7_scoreboard")]
+players_path = NodePath("../Players")
 
 [node name="Hud" parent="." instance=ExtResource("4_hud")]
 

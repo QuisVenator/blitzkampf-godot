@@ -23,6 +23,12 @@ func _ready() -> void:
 
 func take_damage(_amount: int, _attacker: Node = null) -> void:
 	hits += 1
+	_flash()
+	_flash.rpc()
+
+
+@rpc("authority", "call_remote", "unreliable")
+func _flash() -> void:
 	if _flash_tween:
 		_flash_tween.kill()
 	_flash_tween = create_tween()

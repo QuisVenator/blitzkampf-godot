@@ -34,3 +34,7 @@ func _ready() -> void:
 	_pickup.ammo_in_mag = _ammo_in_mag
 	_pickup.ammo_reserve = _ammo_reserve
 	_pickup.collected.connect(queue_free)
+	# The server simulates the fall; other peers just show the replicated transform.
+	if not is_multiplayer_authority():
+		freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
+		freeze = true

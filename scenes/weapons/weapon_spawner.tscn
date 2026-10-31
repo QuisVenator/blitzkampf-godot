@@ -16,6 +16,14 @@ radial_segments = 20
 [sub_resource type="SphereShape3D" id="pickup_sphere"]
 radius = 0.1
 
+[sub_resource type="SceneReplicationConfig" id="offer_sync"]
+properties/0/path = NodePath(".:offer_index")
+properties/0/spawn = true
+properties/0/replication_mode = 2
+properties/1/path = NodePath(".:stocked")
+properties/1/spawn = true
+properties/1/replication_mode = 2
+
 [node name="WeaponSpawner" type="Node3D"]
 script = ExtResource("1_script")
 
@@ -41,3 +49,6 @@ shape = SubResource("pickup_sphere")
 
 [node name="RespawnTimer" type="Timer" parent="."]
 one_shot = true
+
+[node name="Sync" type="MultiplayerSynchronizer" parent="."]
+replication_config = SubResource("offer_sync")

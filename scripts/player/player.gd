@@ -40,6 +40,9 @@ var health := 100:
 	set(value):
 		health = value
 		health_changed.emit(health, max_health)
+## Match score, replicated for the scoreboard.
+var kills := 0
+var deaths := 0
 var alive := true:
 	set(value):
 		if value == alive:
@@ -109,6 +112,10 @@ func take_damage(amount: int, attacker: Node = null) -> void:
 
 func _die(attacker: Node) -> void:
 	alive = false
+	deaths += 1
+	var killer := attacker as Player
+	if killer and killer != self:
+		killer.kills += 1
 	_slide_elapsed = 0.0
 	died.emit(attacker)
 	get_tree().create_timer(respawn_delay).timeout.connect(spawn)

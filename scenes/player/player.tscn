@@ -4,7 +4,6 @@
 [ext_resource type="Resource" path="res://resources/player/movement_settings.tres" id="2_settings"]
 [ext_resource type="Script" path="res://scripts/weapons/weapon_manager.gd" id="3_weapons"]
 [ext_resource type="Resource" path="res://resources/weapons/pistol.tres" id="4_pistol"]
-[ext_resource type="PackedScene" path="res://scenes/weapons/dropped_weapon.tscn" id="5_dropped"]
 [ext_resource type="Script" path="res://scripts/weapons/shot_effects.gd" id="6_effects"]
 [ext_resource type="Script" path="res://scripts/player/player_input.gd" id="7_input"]
 [ext_resource type="Script" path="res://scripts/net/net_input.gd" id="8_netinput"]
@@ -51,6 +50,12 @@ properties/5/replication_mode = 2
 properties/6/path = NodePath(".:alive")
 properties/6/spawn = true
 properties/6/replication_mode = 2
+properties/7/path = NodePath(".:kills")
+properties/7/spawn = true
+properties/7/replication_mode = 2
+properties/8/path = NodePath(".:deaths")
+properties/8/spawn = true
+properties/8/replication_mode = 2
 
 [node name="Player" type="CharacterBody3D"]
 collision_layer = 2
@@ -116,7 +121,6 @@ shape = SubResource("interact_sphere")
 [node name="WeaponManager" type="Node" parent="."]
 script = ExtResource("3_weapons")
 starting_weapon = ExtResource("4_pistol")
-dropped_weapon_scene = ExtResource("5_dropped")
 
 [node name="ShotEffects" type="Node3D" parent="WeaponManager"]
 top_level = true

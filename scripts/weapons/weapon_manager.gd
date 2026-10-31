@@ -9,6 +9,12 @@ extends Node
 ## button scheme is a deliberate default that may become configurable later; the
 ## two roles are separate Input Map actions so rebinding needs no code change.
 ## Two-handed weapons always occupy the primary slot alone.
+##
+## Networking: the server runs all of this logic. The owning client holds a
+## mirror: the server tells it what changed (weapons, ammo, reloads, aiming,
+## spread, shots fired, hits) over the `_rpc_*` methods below, and the mirror
+## re-emits the same signals, so HUD, viewmodel and sounds work unchanged. Every
+## other peer only gets the `_rpc_shot` tracer/impact. Clients do not predict.
 
 ## `definition` is null when the slot has just been emptied.
 signal weapon_changed(slot: int, definition: WeaponDefinition)
@@ -31,6 +37,9 @@ const MUZZLE_FALLBACK_DISTANCE := 0.3
 ## Physics layers a bullet hits: world (1), player (2, the body capsule is the
 ## hitbox) and target (3). The shooter's own body is excluded from the ray.
 const BULLET_MASK := (1 << 0) | (1 << 1) | (1 << 2)
+## Payloads of `_rpc_event`.
+const EVENT_HIT := 0
+const EVENT_PICKED_UP := 1
 const COOLDOWN_EPSILON := 0.0001
 
 const RECOIL_KICK := 0.08
@@ -46,7 +55,6 @@ const THROW_UP_SPEED := 2.6
 const THROW_MAX_TUMBLE := 4.5
 
 @export var starting_weapon: WeaponDefinition
-@export var dropped_weapon_scene: PackedScene
 
 var primary: WeaponSlot
 var secondary: WeaponSlot
@@ -56,6 +64,11 @@ var _frame := InputFrame.new()
 ## Slots waiting for the reload in progress to finish (left hand goes first).
 var _reload_queue: Array[int] = []
 var _crosshair_spread_deg := -1.0
+## Slot of the shot being fired, so the `fired` forwarder knows which hand.
+var _last_fired_slot := PRIMARY
+## Server: set once the owning client has its player node and asked for the state;
+## updates sent earlier would hit a node that doesn't exist there yet.
+var _mirror_ready := false
 var _aiming := false
 var _pose_tween: Tween
 var _hip_fov := 75.0
@@ -70,10 +83,14 @@ func _ready() -> void:
 	primary = WeaponSlot.new($"../Head/Camera3D/WeaponHolder")
 	secondary = WeaponSlot.new($"../Head/Camera3D/WeaponHolderLeft")
 	_slots = [primary, secondary]
-	equip(PRIMARY, starting_weapon)
 	_show_holders(true)
 	_player.died.connect(_on_player_died)
 	_player.respawned.connect(_on_player_respawned)
+	if is_multiplayer_authority():
+		equip(PRIMARY, starting_weapon)
+		_connect_owner_updates()
+	elif _player.is_local:
+		_rpc_request_state.rpc_id(1)
 
 
 ## True while any weapon is reloading or waiting to; firing is blocked meanwhile.
@@ -120,14 +137,18 @@ func _show_holders(shown: bool) -> void:
 
 ## Dying drops everything held; respawning starts over with the starting weapon.
 func _on_player_died(_attacker: Node) -> void:
+	_show_holders(false)
+	if not is_multiplayer_authority():
+		return
 	_drop_slot(SECONDARY)
 	_drop_slot(PRIMARY)
 	_reload_queue.clear()
-	_show_holders(false)
 
 
 func _on_player_respawned() -> void:
 	_show_holders(true)
+	if not is_multiplayer_authority():
+		return
 	_clear(SECONDARY)
 	equip(PRIMARY, starting_weapon)
 
@@ -248,15 +269,17 @@ func _fire(slot: WeaponSlot) -> void:
 		muzzle = muzzle_marker.global_position
 
 	if hit.is_empty():
-		_effects.spawn_tracer(muzzle, origin + direction * MAX_RANGE)
+		_show_shot(muzzle, origin + direction * MAX_RANGE, Vector3.ZERO)
+		_rpc_shot.rpc(muzzle, origin + direction * MAX_RANGE, Vector3.ZERO)
 	else:
-		_effects.spawn_tracer(muzzle, hit["position"])
-		_effects.spawn_impact(hit["position"], hit["normal"])
+		_show_shot(muzzle, hit["position"], hit["normal"])
+		_rpc_shot.rpc(muzzle, hit["position"], hit["normal"])
 		var collider: Object = hit["collider"]
 		if collider.has_method(&"take_damage"):
 			collider.take_damage(slot.definition.damage, _player)
 			hit_confirmed.emit()
 
+	_last_fired_slot = _slots.find(slot)
 	_kick_recoil(slot)
 	fired.emit(slot.definition)
 
@@ -378,16 +401,173 @@ func _drop_slot(slot_index: int) -> void:
 	var slot := _slots[slot_index]
 	if slot.is_empty():
 		return
-	var dropped := dropped_weapon_scene.instantiate() as DroppedWeapon
-	dropped.setup(slot.definition, slot.in_mag, slot.reserve)
-	var container := get_tree().get_first_node_in_group(&"drops")
-	(container if container else _player.get_parent()).add_child(dropped)
-
 	var forward := Vector3(-sin(_player.yaw), 0.0, -cos(_player.yaw))
 	var right := Vector3(cos(_player.yaw), 0.0, -sin(_player.yaw))
 	var side := THROW_SIDE_OFFSET * (1.0 if slot_index == PRIMARY else -1.0)
-	dropped.global_position = _player.global_position + forward * THROW_FORWARD_OFFSET + right * side + Vector3.UP * THROW_ORIGIN_HEIGHT
-	dropped.linear_velocity = forward * THROW_FORWARD_SPEED + Vector3.UP * THROW_UP_SPEED
-	dropped.angular_velocity = Vector3(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * THROW_MAX_TUMBLE
+	var data := {
+		"id": slot.definition.id,
+		"mag": slot.in_mag,
+		"reserve": slot.reserve,
+		"position": _player.global_position + forward * THROW_FORWARD_OFFSET + right * side + Vector3.UP * THROW_ORIGIN_HEIGHT,
+		"velocity": forward * THROW_FORWARD_SPEED + Vector3.UP * THROW_UP_SPEED,
+		"spin": Vector3(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * THROW_MAX_TUMBLE,
+	}
+	var spawner := get_tree().get_first_node_in_group(&"drop_spawner") as MultiplayerSpawner
+	spawner.spawn(data)
 	if slot_index == SECONDARY:
 		_clear(SECONDARY)
+
+
+## Builds a thrown weapon from `_drop_slot`'s data. Used as the drop spawner's
+## spawn function, so it runs on every peer.
+static func spawn_dropped(data: Dictionary, scene: PackedScene) -> DroppedWeapon:
+	var dropped := scene.instantiate() as DroppedWeapon
+	dropped.setup(WeaponCatalog.get_default().find(data["id"]), data["mag"], data["reserve"])
+	dropped.position = data["position"]
+	dropped.linear_velocity = data["velocity"]
+	dropped.angular_velocity = data["spin"]
+	return dropped
+
+
+# --- Networking -------------------------------------------------------------
+
+## The owning client's peer id, or 0 if the owner is this process (single player,
+## host) or not connected.
+func _remote_owner() -> int:
+	var peer := _player.peer_id
+	return peer if _mirror_ready and peer != multiplayer.get_unique_id() and multiplayer.get_peers().has(peer) else 0
+
+
+## Server: forwards every state change to the owning client's mirror.
+func _connect_owner_updates() -> void:
+	weapon_changed.connect(func(slot: int, definition: WeaponDefinition) -> void:
+		var peer := _remote_owner()
+		if peer:
+			var held := _slots[slot]
+			_rpc_weapon.rpc_id(peer, slot, definition.id if definition else &"", held.in_mag, held.reserve))
+	ammo_changed.connect(func(slot: int, in_mag: int, reserve: int) -> void:
+		var peer := _remote_owner()
+		if peer:
+			_rpc_ammo.rpc_id(peer, slot, in_mag, reserve))
+	reloading_changed.connect(func(slot: int, reloading: bool) -> void:
+		var peer := _remote_owner()
+		if peer:
+			_rpc_reloading.rpc_id(peer, slot, reloading))
+	aiming_changed.connect(func(aiming: bool) -> void:
+		var peer := _remote_owner()
+		if peer:
+			_rpc_aiming.rpc_id(peer, aiming))
+	spread_changed.connect(func(degrees: float) -> void:
+		var peer := _remote_owner()
+		if peer:
+			_rpc_spread.rpc_id(peer, degrees))
+	fired.connect(func(definition: WeaponDefinition) -> void:
+		var peer := _remote_owner()
+		if peer:
+			_rpc_fired.rpc_id(peer, definition.id, _last_fired_slot))
+	reload_started.connect(func(definition: WeaponDefinition) -> void:
+		var peer := _remote_owner()
+		if peer:
+			_rpc_reload_started.rpc_id(peer, definition.id))
+	hit_confirmed.connect(func() -> void:
+		var peer := _remote_owner()
+		if peer:
+			_rpc_event.rpc_id(peer, EVENT_HIT))
+	picked_up.connect(func() -> void:
+		var peer := _remote_owner()
+		if peer:
+			_rpc_event.rpc_id(peer, EVENT_PICKED_UP))
+
+
+func _show_shot(from: Vector3, to: Vector3, normal: Vector3) -> void:
+	_effects.spawn_tracer(from, to)
+	if normal != Vector3.ZERO:
+		_effects.spawn_impact(to, normal)
+
+
+## Everyone but the server: a bullet's tracer and impact (zero normal = no hit).
+@rpc("authority", "call_remote", "unreliable")
+func _rpc_shot(from: Vector3, to: Vector3, normal: Vector3) -> void:
+	_show_shot(from, to, normal)
+
+
+## A freshly spawned local player asks the server for its whole weapon state,
+## because the server's earlier updates were sent before this node existed.
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_request_state() -> void:
+	if multiplayer.get_remote_sender_id() != _player.peer_id:
+		return
+	_mirror_ready = true
+	var peer := _player.peer_id
+	for slot_index in 2:
+		var slot := _slots[slot_index]
+		_rpc_weapon.rpc_id(peer, slot_index, slot.definition.id if slot.definition else &"", slot.in_mag, slot.reserve)
+		_rpc_reloading.rpc_id(peer, slot_index, slot.is_reloading())
+	_rpc_aiming.rpc_id(peer, _aiming)
+	_rpc_spread.rpc_id(peer, _crosshair_spread_deg)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _rpc_weapon(slot_index: int, id: StringName, in_mag: int, reserve: int) -> void:
+	var slot := _slots[slot_index]
+	slot.definition = WeaponCatalog.get_default().find(id) if id != &"" else null
+	slot.in_mag = in_mag
+	slot.reserve = reserve
+	slot.reload_left = 0.0
+	_rebuild_viewmodel(slot)
+	_move_to_pose(_aiming)
+	weapon_changed.emit(slot_index, slot.definition)
+	ammo_changed.emit(slot_index, in_mag, reserve)
+	reloading_changed.emit(slot_index, false)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _rpc_ammo(slot_index: int, in_mag: int, reserve: int) -> void:
+	var slot := _slots[slot_index]
+	slot.in_mag = in_mag
+	slot.reserve = reserve
+	ammo_changed.emit(slot_index, in_mag, reserve)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _rpc_reloading(slot_index: int, reloading: bool) -> void:
+	var slot := _slots[slot_index]
+	slot.reload_left = slot.definition.reload_duration if reloading and slot.definition else 0.0
+	reloading_changed.emit(slot_index, reloading)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _rpc_reload_started(id: StringName) -> void:
+	reload_started.emit(WeaponCatalog.get_default().find(id))
+
+
+@rpc("authority", "call_remote", "reliable")
+func _rpc_aiming(aiming: bool) -> void:
+	if aiming == _aiming:
+		return
+	_aiming = aiming
+	_move_to_pose(aiming)
+	aiming_changed.emit(aiming)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _rpc_spread(degrees: float) -> void:
+	_crosshair_spread_deg = degrees
+	spread_changed.emit(degrees)
+
+
+@rpc("authority", "call_remote", "unreliable")
+func _rpc_fired(id: StringName, slot_index: int) -> void:
+	var slot := _slots[slot_index]
+	if slot.viewmodel:
+		_kick_recoil(slot)
+	fired.emit(WeaponCatalog.get_default().find(id))
+
+
+@rpc("authority", "call_remote", "reliable")
+func _rpc_event(event: int) -> void:
+	match event:
+		EVENT_HIT:
+			hit_confirmed.emit()
+		EVENT_PICKED_UP:
+			picked_up.emit()
