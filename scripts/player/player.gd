@@ -15,7 +15,6 @@ signal respawned
 
 enum Stance { STANDING, CROUCHING, SLIDING }
 
-const MAX_PITCH := PI / 2.0 - 0.01
 const DEAD_EYE_HEIGHT := 0.4
 
 @export var settings: MovementSettings
@@ -28,12 +27,14 @@ var pitch := 0.0
 var health := 100
 var alive := true
 
+var _frame := InputFrame.new()
 var _slide_elapsed := 0.0
 var _distance_since_step := 0.0
 var _eye_height := 0.0
 var _eye_tween: Tween
 var _capsule: CapsuleShape3D
 
+@onready var input: PlayerInput = $PlayerInput
 @onready var head: Node3D = $Head
 @onready var camera: Camera3D = $Head/Camera3D
 @onready var interact_area: Area3D = $InteractArea
@@ -43,6 +44,7 @@ var _capsule: CapsuleShape3D
 
 func _ready() -> void:
 	_capsule = _collision_shape.shape as CapsuleShape3D
+	input.mouse_sensitivity = settings.mouse_sensitivity
 	_eye_height = settings.eye_height
 	_apply_body_height(false)
 	_update_camera()
@@ -90,6 +92,7 @@ func teleport(to: Vector3, new_yaw: float) -> void:
 	velocity = Vector3.ZERO
 	yaw = new_yaw
 	pitch = 0.0
+	input.set_look(yaw, pitch)
 	reset_physics_interpolation()
 	_update_camera()
 
@@ -98,14 +101,10 @@ func horizontal_speed() -> float:
 	return Vector2(velocity.x, velocity.z).length()
 
 
-func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventMouseMotion and GameInput.is_active():
-		var motion := event as InputEventMouseMotion
-		yaw -= motion.relative.x * settings.mouse_sensitivity
-		pitch = clampf(pitch - motion.relative.y * settings.mouse_sensitivity, -MAX_PITCH, MAX_PITCH)
-
-
 func _process(_delta: float) -> void:
+	# The view follows the live look angles, not the tick-sampled frame.
+	yaw = input.look_yaw
+	pitch = input.look_pitch
 	_update_camera()
 
 
@@ -115,9 +114,9 @@ func _update_camera() -> void:
 
 
 func _physics_process(delta: float) -> void:
-	var input := GameInput.move_vector()
-	var has_wish := input != Vector2.ZERO
-	var wish_world := Basis(Vector3.UP, yaw) * Vector3(input.x, 0.0, input.y)
+	_frame = input.frame()
+	var has_wish := _frame.move != Vector2.ZERO
+	var wish_world := Basis(Vector3.UP, _frame.yaw) * Vector3(_frame.move.x, 0.0, _frame.move.y)
 	var wish_dir := Vector2(wish_world.x, wish_world.z).normalized()
 	var grounded := is_on_floor()
 
@@ -147,7 +146,7 @@ func _physics_process(delta: float) -> void:
 	if not grounded:
 		velocity += get_gravity() * delta
 
-	if GameInput.held(&"jump") and grounded:
+	if _frame.jump and grounded:
 		velocity.y = settings.jump_speed
 		jumped.emit()
 		if stance == Stance.SLIDING:
@@ -188,7 +187,7 @@ func _max_speed(has_wish: bool, grounded: bool) -> float:
 		return settings.max_air_speed
 	if stance != Stance.STANDING:
 		return settings.max_crouch_speed
-	if has_wish and GameInput.held(&"sprint"):
+	if has_wish and _frame.sprint:
 		return settings.max_sprint_speed
 	return settings.max_ground_speed
 
@@ -197,9 +196,9 @@ func _max_speed(has_wish: bool, grounded: bool) -> float:
 ## starts a slide instead. A slide ends when crouch is released (so slides can
 ## be chained with short sprints) or once it has bled off too much speed.
 func _update_stance(has_wish: bool, wish_dir: Vector2, grounded: bool, delta: float) -> void:
-	if GameInput.just_pressed(&"crouch") and stance == Stance.STANDING:
+	if _frame.crouch_pressed and stance == Stance.STANDING:
 		_set_stance(Stance.CROUCHING)
-		if grounded and has_wish and GameInput.held(&"sprint"):
+		if grounded and has_wish and _frame.sprint:
 			_start_slide(wish_dir)
 
 	if stance == Stance.SLIDING:
@@ -207,7 +206,7 @@ func _update_stance(has_wish: bool, wish_dir: Vector2, grounded: bool, delta: fl
 		if not grounded or horizontal_speed() <= settings.max_crouch_speed:
 			stance = Stance.CROUCHING
 
-	if stance != Stance.STANDING and not GameInput.held(&"crouch") and _can_stand():
+	if stance != Stance.STANDING and not _frame.crouch and _can_stand():
 		_set_stance(Stance.STANDING)
 
 

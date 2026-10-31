@@ -52,6 +52,7 @@ var primary: WeaponSlot
 var secondary: WeaponSlot
 
 var _slots: Array[WeaponSlot] = []
+var _frame := InputFrame.new()
 ## Slots waiting for the reload in progress to finish (left hand goes first).
 var _reload_queue: Array[int] = []
 var _crosshair_spread_deg := -1.0
@@ -139,23 +140,24 @@ func _clear(slot_index: int) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	_frame = _player.input.frame()
 	_update_aiming()
 	_update_spread()
 	if not _player.alive:
 		return
 
-	if GameInput.just_pressed(&"interact"):
+	if _frame.interact_pressed:
 		_try_pickup(false)
-	elif GameInput.just_pressed(&"interact_alt"):
+	elif _frame.interact_alt_pressed:
 		_try_pickup(true)
-	if GameInput.just_pressed(&"reload"):
+	if _frame.reload_pressed:
 		_start_reload()
 
-	_tick_slot(PRIMARY, &"fire", delta)
-	_tick_slot(SECONDARY, &"fire_secondary", delta)
+	_tick_slot(PRIMARY, _frame.fire, delta)
+	_tick_slot(SECONDARY, _frame.fire_secondary, delta)
 
 
-func _tick_slot(slot_index: int, fire_action: StringName, delta: float) -> void:
+func _tick_slot(slot_index: int, firing: bool, delta: float) -> void:
 	var slot := _slots[slot_index]
 	if slot.is_empty():
 		return
@@ -166,7 +168,7 @@ func _tick_slot(slot_index: int, fire_action: StringName, delta: float) -> void:
 		return
 
 	slot.cooldown -= delta
-	if GameInput.held(fire_action) and not is_reloading() and slot.cooldown <= COOLDOWN_EPSILON and slot.in_mag > 0:
+	if firing and not is_reloading() and slot.cooldown <= COOLDOWN_EPSILON and slot.in_mag > 0:
 		slot.cooldown = slot.definition.fire_cooldown
 		slot.in_mag -= 1
 		ammo_changed.emit(slot_index, slot.in_mag, slot.reserve)
@@ -176,7 +178,7 @@ func _tick_slot(slot_index: int, fire_action: StringName, delta: float) -> void:
 ## Sights come up while the aim button is held. They drop for a reload and are
 ## unavailable while wielding two weapons (the aim button's role there is firing).
 func _update_aiming() -> void:
-	var wants_aim := _player.alive and GameInput.held(&"aim") and not is_akimbo() and not primary.is_reloading()
+	var wants_aim := _player.alive and _frame.aim and not is_akimbo() and not primary.is_reloading()
 	if wants_aim == _aiming:
 		return
 	_aiming = wants_aim

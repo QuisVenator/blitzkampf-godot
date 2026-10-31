@@ -9,7 +9,7 @@ Rough order of intent, not a commitment. Tick items off (and move them to Done) 
 - [ ] Sniper weapons: scope overlay, higher zoom, hidden viewmodel while scoped (new `WeaponDefinition` mode, not a code branch)
 
 ## Multiplayer path (plan: server-authoritative, ENet, listen-server + headless dedicated; see AGENTS.md when it lands)
-- [ ] M1 Split input from simulation: `InputFrame` + `PlayerInput` sources (local / bot / remote), presentation vs simulation, `WeaponCatalog`
+- [ ] M1b Split presentation from simulation in `Player`/`WeaponManager` (camera/HUD/viewmodels local-only, third-person placeholder for others); do together with M2 where it is needed
 - [ ] M2 Connect/spawn/replicate: `Net` autoload, main menu (host/join), spawner, state sync, `tools/net_test.gd` + `tools/run_local.sh`
 - [ ] M3 Networked combat: server-side fire/ammo/pickups, shot events, match state + scoreboard
 - [ ] M4 Feel: lag simulator, remote interpolation, client prediction + reconciliation
@@ -32,6 +32,7 @@ Rough order of intent, not a commitment. Tick items off (and move them to Done) 
 - [ ] Lighting is dimmer than the three.js original
 
 ## Done
+- [x] M1 Input split: `InputFrame` + `PlayerInput` with `LocalInput`/`ScriptedInput` sources, `WeaponCatalog`; a scripted bot player can walk and shoot in the smoke test
 - [x] M0 Combat basics: health, damage, death (drops weapons), respawn at a random spawn, HUD health, `take_damage`, players hit by hitscan
 - [x] Pause menu (Esc) with Resume, resolution, fullscreen, Quit; settings persisted in `user://settings.cfg`
 - [x] Movement, 3 weapons, targets, pickups/drops, HUD, placeholder SFX

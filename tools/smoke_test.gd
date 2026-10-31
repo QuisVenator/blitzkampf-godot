@@ -124,6 +124,7 @@ func _run() -> void:
 
 	await _test_akimbo()
 	await _test_pause()
+	await _test_bot()
 	await _test_health()
 
 	print("smoke test: %s" % ("OK" if _failures == 0 else "%d FAILED" % _failures))
@@ -243,6 +244,55 @@ func _test_pause() -> void:
 	_send_escape()
 	await _frames(2)
 	_check("Esc resumes", not paused and not menu.visible)
+
+
+## A second Player driven by ScriptedInput (the same path a bot or remote player
+## will use): it walks, shoots the real player and gets the kill credit.
+func _test_bot() -> void:
+	var catalog := WeaponCatalog.get_default()
+	_check("catalog finds weapons by id", catalog.find(&"smg") != null and catalog.find(&"smg").id == &"smg" and catalog.find(&"nope") == null)
+
+	var bot := (load("res://scenes/player/player.tscn") as PackedScene).instantiate() as Player
+	var script := ScriptedInput.new()
+	bot.get_node("PlayerInput").source = script
+	_main.add_child(bot)
+	bot.teleport(Vector3(0, 0, 4), 0.0)
+	_player.respawn_delay = 100.0
+	_player.teleport(Vector3(0, 0, -8), 0.0)
+	await _frames(10)
+
+	script.frame.move = Vector2(0, -1)
+	await _frames(30)
+	_check("scripted player walks", bot.global_position.z < 4.0 - 2.0 and bot.horizontal_speed() > 6.0)
+	script.frame.move = Vector2.ZERO
+	await _frames(10)
+
+	var killer: Array[Node] = []
+	_player.died.connect(func(attacker: Node) -> void: killer.append(attacker))
+	script.frame.yaw = 0.0
+	script.frame.fire = true
+	await create_timer(2.0).timeout
+	script.frame.fire = false
+	_check("scripted player shot the player", _player.health < 100)
+	_check("kill is credited to the shooter", killer.size() == 1 and killer[0] == bot)
+	_check("shooter isn't hurt by own shots", bot.health == 100)
+
+	# Mouse look goes through PlayerInput and moves the view without waiting for a tick.
+	_player.teleport(Vector3(0, 0, 8), 0.0)
+	var motion := InputEventMouseMotion.new()
+	motion.relative = Vector2(100, 0)
+	Input.parse_input_event(motion)
+	Input.flush_buffered_events()
+	await process_frame
+	await process_frame
+	# (The window's stretch transform scales `relative`, so only check direction.)
+	_check("mouse look turns the view", _player.yaw < -0.1 and is_equal_approx(_player.yaw, _player.input.look_yaw))
+
+	# Put the real player back for the remaining tests.
+	bot.queue_free()
+	_player.respawn_delay = 0.5
+	_player.spawn()
+	await _frames(5)
 
 
 ## Damage, death (drops weapons, no control), respawn with a fresh loadout.
