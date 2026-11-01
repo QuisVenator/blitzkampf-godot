@@ -47,3 +47,5 @@ Rough order of intent, not a commitment. Tick items off (and move them to Done) 
 - [x] Aiming down sights, Quaternius weapon models
 - [x] Akimbo for one-handed weapons (F replaces left, G replaces right; two-handed drops both)
 - [x] Reload order for akimbo (left then right, skip full, no firing meanwhile)
+
+- [ ] `prediction` net scenario is flaky (~1 in 4 runs: worst correction 0.6-0.9 m vs limit 0.5 m, also before the ammo prediction change); investigate sources of mispredicted movement under loss/lag

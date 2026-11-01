@@ -10,6 +10,13 @@ var reserve := 0
 var cooldown := 0.0
 var reload_left := 0.0
 var spread_deg := -1.0
+## Shots fired since the weapon was equipped. The server counts them and sends the
+## total with every ammo update; the owning client uses it to tell which of its
+## predicted shots the server has already accounted for.
+var shots := 0
+## Owning client: when (ms) it predicted each shot the server hasn't confirmed yet.
+## Each one is subtracted from the displayed magazine until the server catches up.
+var pending_shots: Array[int] = []
 
 ## Node the viewmodel hangs under, and its resting (hip) pose.
 var holder: Node3D

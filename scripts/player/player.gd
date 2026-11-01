@@ -200,6 +200,8 @@ func _on_alive_changed() -> void:
 
 func teleport(to: Vector3, new_yaw: float) -> void:
 	global_position = to
+	# Nobody saw this body at its old place as being here: shots mustn't rewind across a teleport.
+	_pose_history.clear()
 	velocity = Vector3.ZERO
 	yaw = new_yaw
 	pitch = 0.0

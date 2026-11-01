@@ -41,6 +41,8 @@ const MUZZLE_FALLBACK_DISTANCE := 0.3
 ## hitbox) and target (3). The shooter's own body is excluded from the ray.
 const BULLET_MASK := (1 << 0) | (1 << 1) | (1 << 2)
 const PLAYER_LAYER := 1 << 1
+## Owning client: a predicted shot the server hasn't confirmed by now was refused.
+const PENDING_SHOT_TIMEOUT_MS := 1500
 ## Payloads of `_rpc_event`.
 const EVENT_HIT := 0
 const EVENT_PICKED_UP := 1
@@ -124,6 +126,7 @@ func equip(slot_index: int, new_definition: WeaponDefinition, mag := -1, spare :
 	slot.reserve = new_definition.reserve_ammo if spare < 0 else spare
 	slot.cooldown = 0.0
 	slot.reload_left = 0.0
+	slot.shots = 0
 	_reload_queue.erase(slot_index)
 	_rebuild_viewmodel(slot)
 	_advance_reload_queue()
@@ -217,25 +220,47 @@ func _physics_process(delta: float) -> void:
 	_tick_slot(SECONDARY, _frame.fire_secondary, delta)
 
 
-## Predicting client: shows aiming, recoil and the shot sound at once instead of
-## waiting a round trip for the server. Only feedback is predicted; ammo, damage,
-## tracers and impacts still come from the server, and the server's aiming and
-## "fired" messages are ignored here (see `_rpc_aiming`, `_rpc_fired`).
+## Predicting client: shows aiming, recoil, the shot sound, the tracer and the
+## ammo count at once instead of waiting a round trip for the server. Damage and
+## hit confirmation still come from the server, and its aiming, "fired", spread
+## and shot messages are ignored here (see `_rpc_aiming`, `_rpc_fired`,
+## `_rpc_spread`, `_rpc_shot`). Predicted shots are subtracted from the magazine
+## until the server's shot count (`_rpc_ammo`) covers them.
 func _predict_feedback(delta: float) -> void:
 	_frame = _player.input.frame()
 	_update_aiming()
+	_update_spread()
 	if not _player.alive:
 		return
 	for slot_index in 2:
 		var slot := _slots[slot_index]
+		_expire_pending_shots(slot_index)
 		if slot.is_empty() or slot.reload_left > 0.0:
 			continue
 		slot.cooldown -= delta
 		var firing := _frame.fire if slot_index == PRIMARY else _frame.fire_secondary
 		if firing and not is_reloading() and slot.cooldown <= COOLDOWN_EPSILON and slot.in_mag > 0:
 			slot.cooldown = slot.definition.fire_cooldown
+			slot.pending_shots.append(Time.get_ticks_msec())
+			slot.in_mag -= 1
+			ammo_changed.emit(slot_index, slot.in_mag, slot.reserve)
+			var shot := _trace(slot, false)
+			_show_shot(slot.definition.id, shot["muzzle"], shot["end"], shot["normal"])
 			_kick_recoil(slot)
 			fired.emit(slot.definition)
+
+
+## A predicted shot the server never counted (it was refused, e.g. a reload had
+## started) stops being subtracted after a while.
+func _expire_pending_shots(slot_index: int) -> void:
+	var slot := _slots[slot_index]
+	var expired := 0
+	while not slot.pending_shots.is_empty() and Time.get_ticks_msec() - slot.pending_shots[0] > PENDING_SHOT_TIMEOUT_MS:
+		slot.pending_shots.pop_front()
+		expired += 1
+	if expired:
+		slot.in_mag += expired
+		ammo_changed.emit(slot_index, slot.in_mag, slot.reserve)
 
 
 func _tick_slot(slot_index: int, firing: bool, delta: float) -> void:
@@ -252,6 +277,7 @@ func _tick_slot(slot_index: int, firing: bool, delta: float) -> void:
 	if firing and not is_reloading() and slot.cooldown <= COOLDOWN_EPSILON and slot.in_mag > 0:
 		slot.cooldown = slot.definition.fire_cooldown
 		slot.in_mag -= 1
+		slot.shots += 1
 		ammo_changed.emit(slot_index, slot.in_mag, slot.reserve)
 		_fire(slot)
 
@@ -309,22 +335,12 @@ func _update_spread() -> void:
 
 
 func _fire(slot: WeaponSlot) -> void:
-	var origin := _camera.global_position
-	var direction := _apply_spread(-_camera.global_basis.z, _camera.global_basis, slot.spread_deg)
-	var hit := _cast_ray(origin, direction)
-
-	var muzzle := origin + direction * MUZZLE_FALLBACK_DISTANCE
-	var muzzle_marker := slot.muzzle_marker()
-	if muzzle_marker:
-		muzzle = muzzle_marker.global_position
-
+	var shot := _trace(slot, true)
 	var id := slot.definition.id
-	if hit.is_empty():
-		_show_shot(id, muzzle, origin + direction * MAX_RANGE, Vector3.ZERO)
-		_rpc_shot.rpc(id, muzzle, origin + direction * MAX_RANGE, Vector3.ZERO)
-	else:
-		_show_shot(id, muzzle, hit["position"], hit["normal"])
-		_rpc_shot.rpc(id, muzzle, hit["position"], hit["normal"])
+	_show_shot(id, shot["muzzle"], shot["end"], shot["normal"])
+	_rpc_shot.rpc(id, shot["muzzle"], shot["end"], shot["normal"])
+	var hit: Dictionary = shot["hit"]
+	if not hit.is_empty():
 		var collider: Object = hit["collider"]
 		if collider.has_method(&"take_damage"):
 			collider.take_damage(slot.definition.damage, _player)
@@ -335,14 +351,34 @@ func _fire(slot: WeaponSlot) -> void:
 	fired.emit(slot.definition)
 
 
+## Where a shot from `slot` goes: its muzzle, end point, surface normal (zero = no
+## hit) and the raw ray hit. The spread roll is seeded by the frame's sequence number
+## and the hand, so the owning client's predicted shot takes exactly the path the
+## server's will. `compensated` is for the server (see `_cast_ray`).
+func _trace(slot: WeaponSlot, compensated: bool) -> Dictionary:
+	var origin := _camera.global_position
+	var rng := RandomNumberGenerator.new()
+	rng.seed = _frame.sequence * 2 + _slots.find(slot)
+	var direction := _apply_spread(-_camera.global_basis.z, _camera.global_basis, slot.spread_deg, rng)
+	var hit := _cast_ray(origin, direction, compensated)
+
+	var muzzle := origin + direction * MUZZLE_FALLBACK_DISTANCE
+	var muzzle_marker := slot.muzzle_marker()
+	if muzzle_marker:
+		muzzle = muzzle_marker.global_position
+	if hit.is_empty():
+		return {"muzzle": muzzle, "end": origin + direction * MAX_RANGE, "normal": Vector3.ZERO, "hit": hit}
+	return {"muzzle": muzzle, "end": hit["position"], "normal": hit["normal"], "hit": hit}
+
+
 ## The first thing a bullet hits, shaped like `intersect_ray`'s result. For a shooter
 ## on another machine (`view_tick` set) other players are tested at the pose the
 ## shooter saw them in, not where they are now (lag compensation); the world and
 ## targets are static or authoritative, so the physics query still handles them.
-func _cast_ray(origin: Vector3, direction: Vector3) -> Dictionary:
+func _cast_ray(origin: Vector3, direction: Vector3, compensated: bool) -> Dictionary:
 	var query := PhysicsRayQueryParameters3D.create(origin, origin + direction * MAX_RANGE, BULLET_MASK)
 	query.exclude = [_player.get_rid()]
-	if _frame.view_tick <= 0.0:
+	if not compensated or _frame.view_tick <= 0.0:
 		return _player.get_world_3d().direct_space_state.intersect_ray(query)
 
 	query.collision_mask = BULLET_MASK & ~PLAYER_LAYER
@@ -361,14 +397,14 @@ func _cast_ray(origin: Vector3, direction: Vector3) -> Dictionary:
 
 
 ## Random direction inside the shot cone (half-angle `spread_deg`).
-func _apply_spread(forward: Vector3, basis: Basis, spread_deg: float) -> Vector3:
+func _apply_spread(forward: Vector3, basis: Basis, spread_deg: float, rng: RandomNumberGenerator) -> Vector3:
 	if spread_deg <= 0.0:
 		return forward
 	var spread := deg_to_rad(spread_deg)
-	var spin := randf() * TAU
+	var spin := rng.randf() * TAU
 	# sqrt() samples the cone's circular cross-section uniformly instead of
 	# bunching shots toward the centre.
-	var cone := sqrt(randf()) * spread
+	var cone := sqrt(rng.randf()) * spread
 	return (forward * cos(cone) + basis.x * sin(cone) * cos(spin) + basis.y * sin(cone) * sin(spin)).normalized()
 
 
@@ -528,11 +564,11 @@ func _connect_owner_updates() -> void:
 		var peer := _remote_owner()
 		if peer:
 			var held := _slots[slot]
-			_rpc_weapon.rpc_id(peer, slot, definition.id if definition else &"", held.in_mag, held.reserve))
+			_rpc_weapon.rpc_id(peer, slot, definition.id if definition else &"", held.in_mag, held.reserve, held.shots))
 	ammo_changed.connect(func(slot: int, in_mag: int, reserve: int) -> void:
 		var peer := _remote_owner()
 		if peer:
-			_rpc_ammo.rpc_id(peer, slot, in_mag, reserve))
+			_rpc_ammo.rpc_id(peer, slot, in_mag, reserve, _slots[slot].shots))
 	reloading_changed.connect(func(slot: int, reloading: bool) -> void:
 		var peer := _remote_owner()
 		if peer:
@@ -576,6 +612,8 @@ func _show_shot(id: StringName, from: Vector3, to: Vector3, normal: Vector3) -> 
 ## and the shot's sound for players other than the shooter.
 @rpc("authority", "call_remote", "unreliable")
 func _rpc_shot(id: StringName, from: Vector3, to: Vector3, normal: Vector3) -> void:
+	if _player.is_local:
+		return  # the owner already saw its own predicted tracer
 	_show_shot(id, from, to, normal)
 
 
@@ -603,16 +641,18 @@ func _rpc_request_state() -> void:
 	var peer := _player.peer_id
 	for slot_index in 2:
 		var slot := _slots[slot_index]
-		_rpc_weapon.rpc_id(peer, slot_index, slot.definition.id if slot.definition else &"", slot.in_mag, slot.reserve)
+		_rpc_weapon.rpc_id(peer, slot_index, slot.definition.id if slot.definition else &"", slot.in_mag, slot.reserve, slot.shots)
 		_rpc_reloading.rpc_id(peer, slot_index, slot.is_reloading())
 	_rpc_aiming.rpc_id(peer, _aiming)
 	_rpc_spread.rpc_id(peer, _crosshair_spread_deg)
 
 
 @rpc("authority", "call_remote", "reliable")
-func _rpc_weapon(slot_index: int, id: StringName, in_mag: int, reserve: int) -> void:
+func _rpc_weapon(slot_index: int, id: StringName, in_mag: int, reserve: int, shots: int) -> void:
 	var slot := _slots[slot_index]
 	slot.definition = WeaponCatalog.get_default().find(id) if id != &"" else null
+	slot.shots = shots
+	slot.pending_shots.clear()
 	slot.in_mag = in_mag
 	slot.reserve = reserve
 	slot.reload_left = 0.0
@@ -624,17 +664,25 @@ func _rpc_weapon(slot_index: int, id: StringName, in_mag: int, reserve: int) -> 
 
 
 @rpc("authority", "call_remote", "reliable")
-func _rpc_ammo(slot_index: int, in_mag: int, reserve: int) -> void:
+func _rpc_ammo(slot_index: int, in_mag: int, reserve: int, shots: int) -> void:
 	var slot := _slots[slot_index]
-	slot.in_mag = in_mag
+	# Shots the server has now counted are no longer "pending".
+	for i in mini(maxi(shots - slot.shots, 0), slot.pending_shots.size()):
+		slot.pending_shots.pop_front()
+	slot.shots = shots
+	slot.in_mag = in_mag - slot.pending_shots.size()
 	slot.reserve = reserve
-	ammo_changed.emit(slot_index, in_mag, reserve)
+	ammo_changed.emit(slot_index, slot.in_mag, reserve)
 
 
 @rpc("authority", "call_remote", "reliable")
 func _rpc_reloading(slot_index: int, reloading: bool) -> void:
 	var slot := _slots[slot_index]
 	slot.reload_left = slot.definition.reload_duration if reloading and slot.definition else 0.0
+	if reloading:
+		slot.in_mag += slot.pending_shots.size()  # shots fired after this are refused
+		slot.pending_shots.clear()
+		ammo_changed.emit(slot_index, slot.in_mag, slot.reserve)
 	reloading_changed.emit(slot_index, reloading)
 
 
@@ -656,6 +704,8 @@ func _rpc_aiming(aiming: bool) -> void:
 
 @rpc("authority", "call_remote", "reliable")
 func _rpc_spread(degrees: float) -> void:
+	if _player.is_local:
+		return  # worked out locally (`_predict_feedback`)
 	_crosshair_spread_deg = degrees
 	spread_changed.emit(degrees)
 
