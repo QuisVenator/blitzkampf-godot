@@ -11,6 +11,9 @@ const PACKET_SIZE := 11
 const STALE_MS := 500
 ## Packets queued beyond this are skipped to catch up after a stall.
 const MAX_QUEUE := 4
+## With more than this left after the tick's frame, a second frame is simulated in
+## the same tick so a backlog drains instead of becoming permanent delay.
+const CATCH_UP_QUEUE := 2
 
 const HELD_JUMP := 1
 const HELD_SPRINT := 2
@@ -22,6 +25,7 @@ const HELD_AIM := 32
 var _queue: Array[PackedFloat32Array] = []
 var _last := InputFrame.new()
 var _last_sequence := 0
+var _newest_received := 0
 var _last_receive_ms := 0
 var _seen: Array[int] = []
 
@@ -38,26 +42,47 @@ static func pack(frame: InputFrame, counts: Array[int]) -> PackedFloat32Array:
 	return PackedFloat32Array([frame.sequence, frame.move.x, frame.move.y, frame.yaw, frame.pitch, held, counts[0], counts[1], counts[2], counts[3], frame.view_tick])
 
 
+## A packet holds the sender's newest frame, optionally followed by the one before
+## it, so a single lost packet costs nothing (the next one repeats the lost frame).
 func receive(packet: PackedFloat32Array) -> void:
-	if packet.size() != PACKET_SIZE or int(packet[0]) <= _last_sequence:
+	if packet.size() != PACKET_SIZE and packet.size() != PACKET_SIZE * 2:
 		return
-	_queue.append(packet)
+	if packet.size() == PACKET_SIZE * 2:
+		_enqueue(packet.slice(PACKET_SIZE))
+	_enqueue(packet.slice(0, PACKET_SIZE))
 	_last_receive_ms = Time.get_ticks_msec()
+
+
+func _enqueue(packet: PackedFloat32Array) -> void:
+	if int(packet[0]) <= _newest_received:
+		return
+	_newest_received = int(packet[0])
+	_queue.append(packet)
 
 
 func sample(_input: PlayerInput) -> InputFrame:
 	if _queue.is_empty():
-		# Starved: repeat the last held state, without button presses.
-		var repeat := InputFrame.new()
-		repeat.sequence = _last_sequence
-		repeat.yaw = _last.yaw
-		repeat.pitch = _last.pitch
+		# Starved (a late or lost packet): the body waits, so the server never takes
+		# a step the client didn't. Held buttons carry on for the weapons.
+		var idle := InputFrame.new()
+		idle.idle = true
+		idle.sequence = _last_sequence
+		idle.yaw = _last.yaw
+		idle.pitch = _last.pitch
 		if Time.get_ticks_msec() - _last_receive_ms <= STALE_MS:
-			_copy_held(_last, repeat)
-		return repeat
+			_copy_held(_last, idle)
+		return idle
 
 	while _queue.size() > MAX_QUEUE:
 		_queue.pop_front()
+	return _next_frame()
+
+
+func extra_frame() -> InputFrame:
+	return _next_frame() if _queue.size() > CATCH_UP_QUEUE else null
+
+
+func _next_frame() -> InputFrame:
 	var packet: PackedFloat32Array = _queue.pop_front()
 	var frame := _unpack(packet)
 	var counts: Array[int] = [int(packet[6]), int(packet[7]), int(packet[8]), int(packet[9])]

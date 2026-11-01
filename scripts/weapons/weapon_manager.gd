@@ -358,7 +358,7 @@ func _fire(slot: WeaponSlot) -> void:
 func _trace(slot: WeaponSlot, compensated: bool) -> Dictionary:
 	var origin := _camera.global_position
 	var rng := RandomNumberGenerator.new()
-	rng.seed = _frame.sequence * 2 + _slots.find(slot)
+	rng.seed = hash(_frame.sequence * 2 + _slots.find(slot))  # hashed: nearby seeds give similar first rolls
 	var direction := _apply_spread(-_camera.global_basis.z, _camera.global_basis, slot.spread_deg, rng)
 	var hit := _cast_ray(origin, direction, compensated)
 

@@ -7,6 +7,8 @@ extends Node
 
 var _remote: RemoteInput
 var _counts: Array[int] = [0, 0, 0, 0]
+## The previous tick's packet, sent along with the next so one lost packet is harmless.
+var _previous := PackedFloat32Array()
 ## Packets waiting out the simulated lag (`NetSim`): [release time ms, packet].
 var _delayed: Array = []
 
@@ -33,8 +35,12 @@ func _physics_process(_delta: float) -> void:
 	_counts[1] += 1 if frame.reload_pressed else 0
 	_counts[2] += 1 if frame.interact_pressed else 0
 	_counts[3] += 1 if frame.interact_alt_pressed else 0
+	var packet := RemoteInput.pack(frame, _counts)
+	var combined := packet.duplicate()
+	combined.append_array(_previous)
+	_previous = packet
 	if not NetSim.drops():
-		_delayed.append([Time.get_ticks_msec() + NetSim.lag_ms, RemoteInput.pack(frame, _counts)])
+		_delayed.append([Time.get_ticks_msec() + NetSim.lag_ms, combined])
 	while not _delayed.is_empty() and _delayed[0][0] <= Time.get_ticks_msec():
 		submit.rpc_id(1, _delayed.pop_front()[1])
 

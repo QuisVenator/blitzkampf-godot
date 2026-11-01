@@ -27,11 +27,21 @@ func frame() -> InputFrame:
 		_frame = source.sample(self)
 		_sequence += 1
 		# A network source brings the sender's sequence number; others get ours.
-		if _frame.sequence == 0:
+		if _frame.sequence == 0 and not _frame.idle:
 			_frame.sequence = _sequence
 		look_yaw = _frame.yaw
 		look_pitch = _frame.pitch
 	return _frame
+
+
+## See `InputSource.extra_frame`; only meaningful after `frame()` this tick.
+func extra_frame() -> InputFrame:
+	var extra := source.extra_frame()
+	if extra:
+		_frame = extra  # the weapons then act on the newest frame too
+		look_yaw = extra.yaw
+		look_pitch = extra.pitch
+	return extra
 
 
 func set_look(yaw: float, pitch: float) -> void:

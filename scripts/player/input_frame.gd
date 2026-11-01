@@ -8,6 +8,11 @@ extends RefCounted
 ## inputs it has processed (client prediction). Stamped by `PlayerInput`.
 var sequence := 0
 
+## Network only: the server had no input from this player for the tick (it is
+## waiting for a late packet), so the body must not move. Repeating the last input
+## instead would make the server take a step the client never made.
+var idle := false
+
 ## Network only: the server tick the sender was looking at when this frame was
 ## made (other players are drawn in the past); 0 = no lag compensation.
 var view_tick := 0.0

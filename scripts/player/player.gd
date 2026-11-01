@@ -252,7 +252,17 @@ func _physics_process(delta: float) -> void:
 		yaw = _frame.yaw
 		pitch = _frame.pitch
 		_update_camera()
-	_simulate(delta)
+	if not _frame.idle:
+		_simulate(delta)
+	if authority and not predicting:
+		var extra := input.extra_frame()
+		if extra:
+			_frame = extra
+			if not is_local:
+				yaw = _frame.yaw
+				pitch = _frame.pitch
+				_update_camera()
+			_simulate(delta)
 	if predicting:
 		_history.append([_frame.sequence, _frame, global_position])
 		if _history.size() > MAX_HISTORY:
