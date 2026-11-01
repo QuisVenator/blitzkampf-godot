@@ -17,6 +17,7 @@ const SCENARIOS := [
 	["version_mismatch", 1, ["--protocol=999"], ["--server"]],
 	["host", 1, [], ["--host"]],
 	["realinput", 1, [], ["--host"]],
+	["lagcomp", 1, ["--net-lag=80"], ["--server"]],
 ]
 const CLIENT_START_DELAY := 1.5
 const PROCESS_TIMEOUT := 60.0

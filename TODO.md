@@ -9,7 +9,7 @@ Rough order of intent, not a commitment. Tick items off (and move them to Done) 
 - [ ] Sniper weapons: scope overlay, higher zoom, hidden viewmodel while scoped (new `WeaponDefinition` mode, not a code branch)
 
 ## Multiplayer path (plan: server-authoritative, ENet, listen-server + headless dedicated; see AGENTS.md when it lands)
-- [ ] Lag compensation for hit registration (rewind player positions to the shooter's view time)
+- [x] Lag compensation for hit registration (rewind player poses to the shooter's view time)
 - [ ] M3 leftovers: kill feed, match end / round limits
 - [ ] Better bots: navigation mesh pathing, pick up weapons, difficulty levels, bot names/count in the menu
 

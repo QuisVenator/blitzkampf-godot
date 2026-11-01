@@ -20,7 +20,7 @@ const DEAD_EYE_HEIGHT := 0.4
 const BOT_ID_BASE := 1_000_000
 
 # Networking (see the "Networking" section below).
-const SNAPSHOT_SIZE := 12
+const SNAPSHOT_SIZE := 13
 ## Remote players are drawn this far in the past so there is always a newer
 ## snapshot to blend towards.
 const INTERPOLATION_DELAY_MS := 100
@@ -32,6 +32,12 @@ const RECONCILE_SNAP_DISTANCE := 2.0
 const ERROR_SMOOTH_RATE := 12.0
 const MAX_HISTORY := 120
 const MAX_BUFFERED_SNAPSHOTS := 40
+## Lag compensation: the server remembers this many ticks of every body's pose, and a
+## shot is never rewound further than MAX_REWIND_TICKS (a cheater can't claim to have
+## seen the past arbitrarily far back).
+const POSE_HISTORY_TICKS := 60
+const MAX_REWIND_TICKS := 30
+const TICKS_PER_MS := 0.06  # physics ticks are 60 Hz
 
 @export var settings: MovementSettings
 @export var max_health := 100
@@ -95,6 +101,11 @@ var _snapshot_queue: Array = []  # predicting client: [ready ms, snapshot]
 var _interpolation_buffer: Array = []  # remote player on a client: [ms, position, yaw, pitch]
 var _history: Array = []  # predicting client: [sequence, InputFrame, position after the step]
 var _synced := false
+## Server: [tick, position, capsule height] of this body after each of its recent ticks.
+var _pose_history: Array = []
+## Predicting client: the newest snapshot's server tick and when it was due to arrive.
+var _server_tick := 0.0
+var _server_tick_ms := 0
 var _replaying := false
 ## Visible correction after a reconcile; fades to zero so the view never jumps.
 var _error_offset := Vector3.ZERO
@@ -131,6 +142,7 @@ func _ready() -> void:
 	if not is_multiplayer_authority() and not is_local:
 		physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	_update_camera()
+	add_to_group(&"players")
 	if is_multiplayer_authority():
 		spawn()
 
@@ -391,12 +403,17 @@ func _track_footsteps(has_wish: bool, delta: float) -> void:
 
 ## Server: publishes the body's state for all peers (replicated by `StateSync`).
 func _publish_snapshot() -> void:
+	var tick := Engine.get_physics_frames()
 	snapshot = PackedFloat32Array([
 		_frame.sequence,
 		global_position.x, global_position.y, global_position.z,
 		velocity.x, velocity.y, velocity.z,
 		yaw, pitch, stance, _slide_elapsed, 1.0 if is_on_floor() else 0.0,
+		tick,
 	])
+	_pose_history.append([tick, global_position, _capsule.height])
+	if _pose_history.size() > POSE_HISTORY_TICKS:
+		_pose_history.pop_front()
 
 
 ## Client: a snapshot arrived (after the simulated lag, if any, for the predicting
@@ -441,12 +458,17 @@ func _interpolate_remote() -> void:
 ## for the same input, and replays the inputs the server hasn't seen yet if they differ.
 func _reconcile(delta: float) -> void:
 	var latest := PackedFloat32Array()
+	var latest_ms := 0
 	var now := Time.get_ticks_msec()
 	while not _snapshot_queue.is_empty() and _snapshot_queue[0][0] <= now:
-		latest = _snapshot_queue.pop_front()[1]
+		var entry: Array = _snapshot_queue.pop_front()
+		latest_ms = entry[0]
+		latest = entry[1]
 	if latest.is_empty():
 		return
 
+	_server_tick = latest[12]
+	_server_tick_ms = latest_ms
 	var ack := int(latest[0])
 	var server_position := Vector3(latest[1], latest[2], latest[3])
 	var server_velocity := Vector3(latest[4], latest[5], latest[6])
@@ -491,6 +513,39 @@ func _reconcile(delta: float) -> void:
 	_replaying = false
 	_frame = current
 	_error_offset += predicted_end - global_position
+
+
+## Predicting client: the server tick whose state other players are drawn at right
+## now (they are shown `INTERPOLATION_DELAY_MS` in the past). Sent with each input
+## so the server can rewind targets to what this player saw when shooting.
+func view_tick() -> float:
+	if _server_tick_ms == 0:
+		return 0.0
+	var ahead := (Time.get_ticks_msec() - _server_tick_ms - INTERPOLATION_DELAY_MS) * TICKS_PER_MS
+	return _server_tick + ahead
+
+
+## Server: where this body was at `tick` (fractional ticks blend), as
+## [foot position, capsule height]. Lag compensation tests shots against this.
+func pose_at(tick: float) -> Array:
+	if _pose_history.size() < 2:
+		return [global_position, _capsule.height]
+	var newest: float = _pose_history[-1][0]
+	tick = clampf(tick, maxf(newest - MAX_REWIND_TICKS, _pose_history[0][0]), newest)
+	var before: Array = _pose_history[0]
+	var after: Array = _pose_history[-1]
+	for i in range(_pose_history.size() - 1, 0, -1):
+		if _pose_history[i - 1][0] <= tick:
+			before = _pose_history[i - 1]
+			after = _pose_history[i]
+			break
+	var span: float = after[0] - before[0]
+	var t := clampf((tick - before[0]) / span, 0.0, 1.0) if span > 0.0 else 1.0
+	return [(before[1] as Vector3).lerp(after[1], t), after[2] if t > 0.5 else before[2]]
+
+
+func body_radius() -> float:
+	return _capsule.radius
 
 
 ## Server: lets every other peer hear this player's jump or step; their copy of

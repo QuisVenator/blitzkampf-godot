@@ -28,6 +28,7 @@ func _ready() -> void:
 
 func _physics_process(_delta: float) -> void:
 	var frame := _input.frame()
+	frame.view_tick = _player.view_tick()
 	_counts[0] += 1 if frame.crouch_pressed else 0
 	_counts[1] += 1 if frame.reload_pressed else 0
 	_counts[2] += 1 if frame.interact_pressed else 0

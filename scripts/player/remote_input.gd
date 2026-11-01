@@ -35,7 +35,7 @@ static func pack(frame: InputFrame, counts: Array[int]) -> PackedFloat32Array:
 	held |= HELD_FIRE if frame.fire else 0
 	held |= HELD_FIRE_SECONDARY if frame.fire_secondary else 0
 	held |= HELD_AIM if frame.aim else 0
-	return PackedFloat32Array([frame.sequence, frame.move.x, frame.move.y, frame.yaw, frame.pitch, held, counts[0], counts[1], counts[2], counts[3], 0.0])
+	return PackedFloat32Array([frame.sequence, frame.move.x, frame.move.y, frame.yaw, frame.pitch, held, counts[0], counts[1], counts[2], counts[3], frame.view_tick])
 
 
 func receive(packet: PackedFloat32Array) -> void:
@@ -80,6 +80,7 @@ func _unpack(packet: PackedFloat32Array) -> InputFrame:
 	frame.move = Vector2(packet[1], packet[2])
 	frame.yaw = packet[3]
 	frame.pitch = packet[4]
+	frame.view_tick = packet[10]
 	var held := int(packet[5])
 	frame.jump = held & HELD_JUMP != 0
 	frame.sprint = held & HELD_SPRINT != 0

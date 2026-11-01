@@ -40,6 +40,7 @@ const MUZZLE_FALLBACK_DISTANCE := 0.3
 ## Physics layers a bullet hits: world (1), player (2, the body capsule is the
 ## hitbox) and target (3). The shooter's own body is excluded from the ray.
 const BULLET_MASK := (1 << 0) | (1 << 1) | (1 << 2)
+const PLAYER_LAYER := 1 << 1
 ## Payloads of `_rpc_event`.
 const EVENT_HIT := 0
 const EVENT_PICKED_UP := 1
@@ -310,9 +311,7 @@ func _update_spread() -> void:
 func _fire(slot: WeaponSlot) -> void:
 	var origin := _camera.global_position
 	var direction := _apply_spread(-_camera.global_basis.z, _camera.global_basis, slot.spread_deg)
-	var query := PhysicsRayQueryParameters3D.create(origin, origin + direction * MAX_RANGE, BULLET_MASK)
-	query.exclude = [_player.get_rid()]
-	var hit := _player.get_world_3d().direct_space_state.intersect_ray(query)
+	var hit := _cast_ray(origin, direction)
 
 	var muzzle := origin + direction * MUZZLE_FALLBACK_DISTANCE
 	var muzzle_marker := slot.muzzle_marker()
@@ -334,6 +333,31 @@ func _fire(slot: WeaponSlot) -> void:
 	_last_fired_slot = _slots.find(slot)
 	_kick_recoil(slot)
 	fired.emit(slot.definition)
+
+
+## The first thing a bullet hits, shaped like `intersect_ray`'s result. For a shooter
+## on another machine (`view_tick` set) other players are tested at the pose the
+## shooter saw them in, not where they are now (lag compensation); the world and
+## targets are static or authoritative, so the physics query still handles them.
+func _cast_ray(origin: Vector3, direction: Vector3) -> Dictionary:
+	var query := PhysicsRayQueryParameters3D.create(origin, origin + direction * MAX_RANGE, BULLET_MASK)
+	query.exclude = [_player.get_rid()]
+	if _frame.view_tick <= 0.0:
+		return _player.get_world_3d().direct_space_state.intersect_ray(query)
+
+	query.collision_mask = BULLET_MASK & ~PLAYER_LAYER
+	var hit := _player.get_world_3d().direct_space_state.intersect_ray(query)
+	var nearest := origin.distance_to(hit["position"]) if not hit.is_empty() else MAX_RANGE
+	for node in get_tree().get_nodes_in_group(&"players"):
+		var other := node as Player
+		if other == _player or not other.alive:
+			continue
+		var pose := other.pose_at(_frame.view_tick)
+		var strike := CapsuleRay.intersect(origin, direction, pose[0], pose[1], other.body_radius())
+		if not strike.is_empty() and strike["distance"] < nearest:
+			nearest = strike["distance"]
+			hit = {"position": origin + direction * nearest, "normal": strike["normal"], "collider": other}
+	return hit
 
 
 ## Random direction inside the shot cone (half-angle `spread_deg`).

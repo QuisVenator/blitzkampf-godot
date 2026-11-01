@@ -8,6 +8,10 @@ extends RefCounted
 ## inputs it has processed (client prediction). Stamped by `PlayerInput`.
 var sequence := 0
 
+## Network only: the server tick the sender was looking at when this frame was
+## made (other players are drawn in the past); 0 = no lag compensation.
+var view_tick := 0.0
+
 ## Move intent: x = right, y = back (same axes as `Input.get_vector`).
 var move := Vector2.ZERO
 ## View angles in radians.
