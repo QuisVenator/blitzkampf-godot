@@ -18,7 +18,7 @@ var shots := 0
 ## Each one is subtracted from the displayed magazine until the server catches up.
 var pending_shots: Array[int] = []
 
-## Node the viewmodel hangs under, and its resting (hip) pose.
+## Node the viewmodel hangs under (null if none is drawn), and its resting (hip) pose.
 var holder: Node3D
 var hip_position := Vector3.ZERO
 var hip_yaw := 0.0
@@ -26,10 +26,12 @@ var viewmodel: Node3D
 var recoil_tween: Tween
 
 
+## `holder_node` is null for bodies nobody plays (no viewmodel is drawn for them).
 func _init(holder_node: Node3D) -> void:
 	holder = holder_node
-	hip_position = holder_node.position
-	hip_yaw = holder_node.rotation.y
+	if holder_node:
+		hip_position = holder_node.position
+		hip_yaw = holder_node.rotation.y
 
 
 func is_empty() -> bool:

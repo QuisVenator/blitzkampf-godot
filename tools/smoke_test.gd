@@ -88,7 +88,7 @@ func _run() -> void:
 	await create_timer(0.7).timeout
 	_check("aiming", _weapons.is_aiming())
 	_check_near("ads fov", _player.camera.fov, _weapons.primary.definition.ads_fov, 0.1)
-	var sight := _player.camera.get_node("WeaponHolder").get_child(0).find_child("Sight", true, false) as Node3D
+	var sight := _weapons.primary.holder.get_child(0).find_child("Sight", true, false) as Node3D
 	var sight_local := _player.camera.to_local(sight.global_position)
 	_check_near("sight centred horizontally", sight_local.x, 0.0, 0.002)
 	_check_near("sight centred vertically", sight_local.y, 0.0, 0.002)
@@ -179,7 +179,7 @@ func _test_akimbo() -> void:
 	_check("F adds a second one-handed weapon", _weapons.is_akimbo() and _weapons.secondary.definition == smg)
 	_check("secondary keeps its ammo", _weapons.secondary.in_mag == 10 and _weapons.secondary.reserve == 20)
 	_check("nothing dropped when pairing", _dropped_count() == dropped_before)
-	_check("left viewmodel shown", _player.camera.get_node("WeaponHolderLeft").get_child_count() == 1)
+	_check("left viewmodel shown", _weapons.secondary.holder.get_child_count() == 1)
 
 	# No aiming while akimbo; each button shoots its own hand.
 	Input.action_press(&"aim")
@@ -246,7 +246,7 @@ func _test_akimbo() -> void:
 	await _press(&"interact")
 	_check("two-handed pickup is alone in the primary", _weapons.primary.definition == shotgun and not _weapons.is_akimbo())
 	_check("both held weapons were dropped", _dropped_count() == dropped_before + 4)
-	_check("left viewmodel removed", _player.camera.get_node("WeaponHolderLeft").get_child_count() == 0)
+	_check("left viewmodel removed", _weapons.secondary.holder.get_child_count() == 0)
 
 	# One-handed over a two-handed primary replaces it instead of pairing.
 	_spawn_dropped(pistol, 4, 4)

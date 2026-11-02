@@ -1,0 +1,32 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/player/viewmodel_view.gd" id="1_view"]
+
+[node name="ViewmodelView" type="SubViewportContainer"]
+physics_interpolation_mode = 2
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+stretch = true
+script = ExtResource("1_view")
+
+[node name="SubViewport" type="SubViewport" parent="."]
+transparent_bg = true
+handle_input_locally = false
+size = Vector2i(1152, 648)
+render_target_update_mode = 4
+
+[node name="Camera" type="Camera3D" parent="SubViewport"]
+cull_mask = 2
+fov = 75.0
+near = 0.05
+far = 10.0
+
+[node name="WeaponHolder" type="Node3D" parent="SubViewport/Camera"]
+transform = Transform3D(0.99802, 0, -0.06279, 0, 1, 0, 0.06279, 0, 0.99802, 0.22, -0.26, -0.42)
+
+[node name="WeaponHolderLeft" type="Node3D" parent="SubViewport/Camera"]
+transform = Transform3D(0.99802, 0, 0.06279, 0, 1, 0, -0.06279, 0, 0.99802, -0.22, -0.26, -0.42)

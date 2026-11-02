@@ -33,6 +33,8 @@ signal pickup_hint_changed(definition: WeaponDefinition, choice: bool)
 ## owner hears their own through the signals above). Emitted on every peer.
 signal heard(sound: StringName, position: Vector3, pitch: float)
 
+const VIEWMODEL_VIEW := preload("res://scenes/player/viewmodel_view.tscn")
+
 const PRIMARY := 0
 const SECONDARY := 1
 
@@ -91,8 +93,16 @@ var _hip_fov := 75.0
 
 func _ready() -> void:
 	_hip_fov = _camera.fov
-	primary = WeaponSlot.new($"../Head/Camera3D/WeaponHolder")
-	secondary = WeaponSlot.new($"../Head/Camera3D/WeaponHolderLeft")
+	if _player.is_local:
+		# Weapons are drawn by a camera of their own (see `ViewmodelView`).
+		var view := VIEWMODEL_VIEW.instantiate() as ViewmodelView
+		add_child(view)  # (the player is still setting up its children)
+		view.bind(_camera)
+		primary = WeaponSlot.new(view.primary_holder)
+		secondary = WeaponSlot.new(view.secondary_holder)
+	else:
+		primary = WeaponSlot.new(null)
+		secondary = WeaponSlot.new(null)
 	_slots = [primary, secondary]
 	_show_holders(true)
 	_player.died.connect(_on_player_died)
@@ -167,8 +177,9 @@ func refill() -> void:
 
 ## Viewmodels exist only for the human playing this body.
 func _show_holders(shown: bool) -> void:
-	primary.holder.visible = shown and _player.is_local
-	secondary.holder.visible = shown and _player.is_local
+	for slot in _slots:
+		if slot.holder:
+			slot.holder.visible = shown
 
 
 ## Dying drops everything held; respawning starts over with the starting weapon.
@@ -305,6 +316,8 @@ func _update_aiming() -> void:
 ## Aiming puts the model's "Sight" marker on the camera axis. The secondary
 ## weapon always rests at its hip pose.
 func _move_to_pose(aiming: bool) -> void:
+	if primary.holder == null:
+		return  # nobody sees this body's viewmodel
 	var definition := primary.definition
 	var target_position := primary.hip_position
 	var target_yaw := primary.hip_yaw
@@ -418,6 +431,8 @@ func _apply_spread(forward: Vector3, basis: Basis, spread_deg: float, rng: Rando
 
 ## Kicks the model itself (not the holder), so recoil never fights the aim tween.
 func _kick_recoil(slot: WeaponSlot) -> void:
+	if slot.viewmodel == null:
+		return
 	if slot.recoil_tween:
 		slot.recoil_tween.kill()
 	slot.viewmodel.position.z = RECOIL_KICK * (RECOIL_KICK_ADS_SCALE if _aiming else 1.0)
@@ -473,8 +488,9 @@ func _rebuild_viewmodel(slot: WeaponSlot) -> void:
 		slot.holder.remove_child(slot.viewmodel)
 		slot.viewmodel.queue_free()
 		slot.viewmodel = null
-	if slot.definition:
+	if slot.definition and slot.holder:
 		slot.viewmodel = slot.definition.model.instantiate()
+		ViewmodelView.assign_layer(slot.viewmodel)
 		slot.holder.add_child(slot.viewmodel)
 
 
