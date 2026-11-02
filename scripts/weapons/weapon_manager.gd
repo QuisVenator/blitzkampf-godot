@@ -397,7 +397,7 @@ func _cast_ray(origin: Vector3, direction: Vector3, compensated: bool) -> Dictio
 		if other == _player or not other.alive:
 			continue
 		var pose := other.pose_at(_frame.view_tick)
-		var strike := CapsuleRay.intersect(origin, direction, pose[0], pose[1], other.body_radius())
+		var strike := CapsuleRay.intersect(origin, direction, pose[Player.Pose.POSITION], pose[Player.Pose.HEIGHT], other.body_radius())
 		if not strike.is_empty() and strike["distance"] < nearest:
 			nearest = strike["distance"]
 			hit = {"position": origin + direction * nearest, "normal": strike["normal"], "collider": other}

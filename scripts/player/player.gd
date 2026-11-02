@@ -20,7 +20,21 @@ const DEAD_EYE_HEIGHT := 0.4
 const BOT_ID_BASE := 1_000_000
 
 # Networking (see the "Networking" section below).
-const SNAPSHOT_SIZE := 13
+## Layout of `snapshot` (one float each; `SIZE` is the length). Index it with these,
+## never with bare numbers.
+enum Snap {
+	ACK,  # sequence of the last input frame this state includes
+	POS_X, POS_Y, POS_Z,
+	VEL_X, VEL_Y, VEL_Z,
+	YAW, PITCH, STANCE, SLIDE, ON_FLOOR,
+	TICK,  # the server's physics tick
+	SIZE,
+}
+## Layouts of the small arrays the networking code keeps (see the vars below).
+enum Queued { READY_MS, DATA }
+enum Blend { READY_MS, POSITION, YAW, PITCH, VELOCITY }
+enum Step { SEQUENCE, FRAME, POSITION }
+enum Pose { TICK, POSITION, HEIGHT }
 ## Remote players are drawn this far in the past so there is always a newer
 ## snapshot to blend towards.
 const INTERPOLATION_DELAY_MS := 100
@@ -97,11 +111,11 @@ var held_secondary := &"":
 var _frame := InputFrame.new()
 ## Remote players: last replicated "on the floor" flag (their body isn't simulated here).
 var _remote_on_floor := true
-var _snapshot_queue: Array = []  # predicting client: [ready ms, snapshot]
-var _interpolation_buffer: Array = []  # remote player on a client: [ms, position, yaw, pitch]
-var _history: Array = []  # predicting client: [sequence, InputFrame, position after the step]
+var _snapshot_queue: Array = []  # predicting client: [ready ms, snapshot] (`Queued`)
+var _interpolation_buffer: Array = []  # remote player on a client, `Blend` layout
+var _history: Array = []  # predicting client, `Step` layout: sequence, InputFrame, position after the step
 var _synced := false
-## Server: [tick, position, capsule height] of this body after each of its recent ticks.
+## Server: `Pose` entries (tick, position, capsule height) of this body after each of its recent ticks.
 var _pose_history: Array = []
 ## Predicting client: the newest snapshot's server tick and when it was due to arrive.
 var _server_tick := 0.0
@@ -423,6 +437,7 @@ func _publish_snapshot() -> void:
 		yaw, pitch, stance, _slide_elapsed, 1.0 if is_on_floor() else 0.0,
 		tick,
 	])
+	assert(snapshot.size() == Snap.SIZE)
 	_pose_history.append([tick, global_position, _capsule.height])
 	if _pose_history.size() > POSE_HISTORY_TICKS:
 		_pose_history.pop_front()
@@ -431,7 +446,7 @@ func _publish_snapshot() -> void:
 ## Client: a snapshot arrived (after the simulated lag, if any, for the predicting
 ## player; remote players are blended at render time).
 func _receive_snapshot(data: PackedFloat32Array) -> void:
-	if data.size() != SNAPSHOT_SIZE or NetSim.drops():
+	if data.size() != Snap.SIZE or NetSim.drops():
 		return
 	var ready_ms := Time.get_ticks_msec() + NetSim.lag_ms
 	if is_local:
@@ -439,11 +454,16 @@ func _receive_snapshot(data: PackedFloat32Array) -> void:
 		if _snapshot_queue.size() > MAX_BUFFERED_SNAPSHOTS:
 			_snapshot_queue.pop_front()
 		return
-	stance = int(data[9]) as Stance
-	_remote_on_floor = data[11] > 0.5
-	_interpolation_buffer.append([ready_ms, Vector3(data[1], data[2], data[3]), data[7], data[8], Vector3(data[4], data[5], data[6])])
+	stance = int(data[Snap.STANCE]) as Stance
+	_remote_on_floor = data[Snap.ON_FLOOR] > 0.5
+	_interpolation_buffer.append([ready_ms, _snap_vector(data, Snap.POS_X), data[Snap.YAW], data[Snap.PITCH], _snap_vector(data, Snap.VEL_X)])
 	if _interpolation_buffer.size() > MAX_BUFFERED_SNAPSHOTS:
 		_interpolation_buffer.pop_front()
+
+
+## Three consecutive snapshot floats starting at `first` as a vector.
+static func _snap_vector(data: PackedFloat32Array, first: Snap) -> Vector3:
+	return Vector3(data[first], data[first + 1], data[first + 2])
 
 
 ## Remote player on a client: shows the body where it was `INTERPOLATION_DELAY_MS` ago.
@@ -451,19 +471,19 @@ func _interpolate_remote() -> void:
 	if _interpolation_buffer.is_empty():
 		return
 	var render_ms := Time.get_ticks_msec() - INTERPOLATION_DELAY_MS
-	while _interpolation_buffer.size() > 2 and _interpolation_buffer[1][0] <= render_ms:
+	while _interpolation_buffer.size() > 2 and _interpolation_buffer[1][Blend.READY_MS] <= render_ms:
 		_interpolation_buffer.pop_front()
 	var from: Array = _interpolation_buffer[0]
 	var to: Array = _interpolation_buffer[1] if _interpolation_buffer.size() > 1 else from
-	var span: float = to[0] - from[0]
-	var t := clampf((render_ms - from[0]) / span, 0.0, 1.0) if span > 0.0 else 1.0
+	var span: float = to[Blend.READY_MS] - from[Blend.READY_MS]
+	var t := clampf((render_ms - from[Blend.READY_MS]) / span, 0.0, 1.0) if span > 0.0 else 1.0
 	# A respawn teleports the body; blending across it would streak.
-	if (from[1] as Vector3).distance_to(to[1]) > RECONCILE_SNAP_DISTANCE:
+	if (from[Blend.POSITION] as Vector3).distance_to(to[Blend.POSITION]) > RECONCILE_SNAP_DISTANCE:
 		t = 1.0 if t > 0.0 else 0.0
-	global_position = (from[1] as Vector3).lerp(to[1], t)
-	yaw = lerp_angle(from[2], to[2], t)
-	pitch = lerpf(from[3], to[3], t)
-	velocity = (from[4] as Vector3).lerp(to[4], t)
+	global_position = (from[Blend.POSITION] as Vector3).lerp(to[Blend.POSITION], t)
+	yaw = lerp_angle(from[Blend.YAW], to[Blend.YAW], t)
+	pitch = lerpf(from[Blend.PITCH], to[Blend.PITCH], t)
+	velocity = (from[Blend.VELOCITY] as Vector3).lerp(to[Blend.VELOCITY], t)
 
 
 ## Predicting client: compares the newest server snapshot with what we predicted
@@ -472,24 +492,24 @@ func _reconcile(delta: float) -> void:
 	var latest := PackedFloat32Array()
 	var latest_ms := 0
 	var now := Time.get_ticks_msec()
-	while not _snapshot_queue.is_empty() and _snapshot_queue[0][0] <= now:
+	while not _snapshot_queue.is_empty() and _snapshot_queue[0][Queued.READY_MS] <= now:
 		var entry: Array = _snapshot_queue.pop_front()
-		latest_ms = entry[0]
-		latest = entry[1]
+		latest_ms = entry[Queued.READY_MS]
+		latest = entry[Queued.DATA]
 	if latest.is_empty():
 		return
 
-	_server_tick = latest[12]
+	_server_tick = latest[Snap.TICK]
 	_server_tick_ms = latest_ms
-	var ack := int(latest[0])
-	var server_position := Vector3(latest[1], latest[2], latest[3])
-	var server_velocity := Vector3(latest[4], latest[5], latest[6])
-	while not _history.is_empty() and _history[0][0] < ack:
+	var ack := int(latest[Snap.ACK])
+	var server_position := _snap_vector(latest, Snap.POS_X)
+	var server_velocity := _snap_vector(latest, Snap.VEL_X)
+	while not _history.is_empty() and _history[0][Step.SEQUENCE] < ack:
 		_history.pop_front()
 
 	var distance := INF
-	if _synced and not _history.is_empty() and _history[0][0] == ack:
-		distance = server_position.distance_to(_history[0][2])
+	if _synced and not _history.is_empty() and _history[0][Step.SEQUENCE] == ack:
+		distance = server_position.distance_to(_history[0][Step.POSITION])
 		_history.pop_front()
 		if distance < RECONCILE_EPSILON:
 			return
@@ -501,10 +521,10 @@ func _reconcile(delta: float) -> void:
 		_synced = true
 		global_position = server_position
 		velocity = server_velocity
-		stance = int(latest[9]) as Stance
-		_slide_elapsed = latest[10]
-		yaw = latest[7]
-		pitch = latest[8]
+		stance = int(latest[Snap.STANCE]) as Stance
+		_slide_elapsed = latest[Snap.SLIDE]
+		yaw = latest[Snap.YAW]
+		pitch = latest[Snap.PITCH]
 		input.set_look(yaw, pitch)
 		_history.clear()
 		_error_offset = Vector3.ZERO
@@ -514,14 +534,14 @@ func _reconcile(delta: float) -> void:
 	var predicted_end := global_position
 	global_position = server_position
 	velocity = server_velocity
-	stance = int(latest[9]) as Stance
-	_slide_elapsed = latest[10]
+	stance = int(latest[Snap.STANCE]) as Stance
+	_slide_elapsed = latest[Snap.SLIDE]
 	var current := _frame
 	_replaying = true
 	for entry in _history:
-		_frame = entry[1]
+		_frame = entry[Step.FRAME]
 		_simulate(delta)
-		entry[2] = global_position
+		entry[Step.POSITION] = global_position
 	_replaying = false
 	_frame = current
 	_error_offset += predicted_end - global_position
@@ -538,22 +558,23 @@ func view_tick() -> float:
 
 
 ## Server: where this body was at `tick` (fractional ticks blend), as
-## [foot position, capsule height]. Lag compensation tests shots against this.
+## a `Pose` entry (foot position, capsule height). Lag compensation tests shots
+## against this.
 func pose_at(tick: float) -> Array:
 	if _pose_history.size() < 2:
-		return [global_position, _capsule.height]
-	var newest: float = _pose_history[-1][0]
-	tick = clampf(tick, maxf(newest - MAX_REWIND_TICKS, _pose_history[0][0]), newest)
+		return [tick, global_position, _capsule.height]
+	var newest: float = _pose_history[-1][Pose.TICK]
+	tick = clampf(tick, maxf(newest - MAX_REWIND_TICKS, _pose_history[0][Pose.TICK]), newest)
 	var before: Array = _pose_history[0]
 	var after: Array = _pose_history[-1]
 	for i in range(_pose_history.size() - 1, 0, -1):
-		if _pose_history[i - 1][0] <= tick:
+		if _pose_history[i - 1][Pose.TICK] <= tick:
 			before = _pose_history[i - 1]
 			after = _pose_history[i]
 			break
-	var span: float = after[0] - before[0]
-	var t := clampf((tick - before[0]) / span, 0.0, 1.0) if span > 0.0 else 1.0
-	return [(before[1] as Vector3).lerp(after[1], t), after[2] if t > 0.5 else before[2]]
+	var span: float = after[Pose.TICK] - before[Pose.TICK]
+	var t := clampf((tick - before[Pose.TICK]) / span, 0.0, 1.0) if span > 0.0 else 1.0
+	return [tick, (before[Pose.POSITION] as Vector3).lerp(after[Pose.POSITION], t), after[Pose.HEIGHT] if t > 0.5 else before[Pose.HEIGHT]]
 
 
 func body_radius() -> float:

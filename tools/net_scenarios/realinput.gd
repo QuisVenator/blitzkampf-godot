@@ -41,7 +41,7 @@ func run_client() -> void:
 		last = me.global_position
 	print("teleports ", jumps)
 	print("CLIENT pos ", me.global_position, " start ", start, " err ", me._error_offset)
-	var server_pos := Vector3(me.snapshot[1], me.snapshot[2], me.snapshot[3])
+	var server_pos := Vector3(me.snapshot[Player.Snap.POS_X], me.snapshot[Player.Snap.POS_Y], me.snapshot[Player.Snap.POS_Z])
 	print("CLIENT snapshot ", server_pos)
 	check("moved without being snapped back", jumps == 0)
 	check("own weapon mirror is aiming", me.get_node("WeaponManager").is_aiming())

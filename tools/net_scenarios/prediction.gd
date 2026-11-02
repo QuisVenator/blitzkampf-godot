@@ -36,6 +36,6 @@ func run_client() -> void:
 
 	scripted.frame = InputFrame.new()
 	await wait_seconds(1.5)
-	var server_pos := Vector3(me.snapshot[1], me.snapshot[2], me.snapshot[3])
+	var server_pos := Vector3(me.snapshot[Player.Snap.POS_X], me.snapshot[Player.Snap.POS_Y], me.snapshot[Player.Snap.POS_Z])
 	var gap := me.global_position.distance_to(server_pos)
 	check("client agrees with the server once idle (gap %.3f m)" % gap, gap < 0.1)

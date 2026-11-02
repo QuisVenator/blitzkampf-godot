@@ -6,7 +6,17 @@ extends InputSource
 ## frame carries the client's sequence number, which the server reports back).
 ## Edge events travel as running counters, so a lost packet can't lose a press.
 
-const PACKET_SIZE := 11
+## Layout of a packet (one float each; `SIZE` is the length).
+enum Field {
+	SEQUENCE, MOVE_X, MOVE_Y, YAW, PITCH,
+	HELD,  # bit set of the HELD_* flags below
+	CROUCH_COUNT, RELOAD_COUNT, INTERACT_COUNT, INTERACT_ALT_COUNT,
+	VIEW_TICK,
+	SIZE,
+}
+## Indices into the running press counters (`pack`'s `counts`), in `Field` order.
+enum Count { CROUCH, RELOAD, INTERACT, INTERACT_ALT }
+const PACKET_SIZE := Field.SIZE
 ## Without news from the client for this long its player stops acting.
 const STALE_MS := 500
 ## Packets queued beyond this are skipped to catch up after a stall.
@@ -30,7 +40,7 @@ var _last_receive_ms := 0
 var _seen: Array[int] = []
 
 
-## `counts` = running totals of [crouch, reload, interact, interact_alt] presses.
+## `counts` = running totals of presses, indexed by `Count`.
 static func pack(frame: InputFrame, counts: Array[int]) -> PackedFloat32Array:
 	var held := 0
 	held |= HELD_JUMP if frame.jump else 0
@@ -39,7 +49,11 @@ static func pack(frame: InputFrame, counts: Array[int]) -> PackedFloat32Array:
 	held |= HELD_FIRE if frame.fire else 0
 	held |= HELD_FIRE_SECONDARY if frame.fire_secondary else 0
 	held |= HELD_AIM if frame.aim else 0
-	return PackedFloat32Array([frame.sequence, frame.move.x, frame.move.y, frame.yaw, frame.pitch, held, counts[0], counts[1], counts[2], counts[3], frame.view_tick])
+	return PackedFloat32Array([
+		frame.sequence, frame.move.x, frame.move.y, frame.yaw, frame.pitch, held,
+		counts[Count.CROUCH], counts[Count.RELOAD], counts[Count.INTERACT], counts[Count.INTERACT_ALT],
+		frame.view_tick,
+	])
 
 
 ## A packet holds the sender's newest frame, optionally followed by the one before
@@ -54,9 +68,9 @@ func receive(packet: PackedFloat32Array) -> void:
 
 
 func _enqueue(packet: PackedFloat32Array) -> void:
-	if int(packet[0]) <= _newest_received:
+	if int(packet[Field.SEQUENCE]) <= _newest_received:
 		return
-	_newest_received = int(packet[0])
+	_newest_received = int(packet[Field.SEQUENCE])
 	_queue.append(packet)
 
 
@@ -85,14 +99,17 @@ func extra_frame() -> InputFrame:
 func _next_frame() -> InputFrame:
 	var packet: PackedFloat32Array = _queue.pop_front()
 	var frame := _unpack(packet)
-	var counts: Array[int] = [int(packet[6]), int(packet[7]), int(packet[8]), int(packet[9])]
+	var counts: Array[int] = [
+		int(packet[Field.CROUCH_COUNT]), int(packet[Field.RELOAD_COUNT]),
+		int(packet[Field.INTERACT_COUNT]), int(packet[Field.INTERACT_ALT_COUNT]),
+	]
 	if _seen.is_empty():
 		_seen = counts.duplicate()
 	# Presses in skipped packets still count: counters only ever grow.
-	frame.crouch_pressed = counts[0] > _seen[0]
-	frame.reload_pressed = counts[1] > _seen[1]
-	frame.interact_pressed = counts[2] > _seen[2]
-	frame.interact_alt_pressed = counts[3] > _seen[3]
+	frame.crouch_pressed = counts[Count.CROUCH] > _seen[Count.CROUCH]
+	frame.reload_pressed = counts[Count.RELOAD] > _seen[Count.RELOAD]
+	frame.interact_pressed = counts[Count.INTERACT] > _seen[Count.INTERACT]
+	frame.interact_alt_pressed = counts[Count.INTERACT_ALT] > _seen[Count.INTERACT_ALT]
 	_seen = counts
 	_last = frame
 	_last_sequence = frame.sequence
@@ -101,12 +118,12 @@ func _next_frame() -> InputFrame:
 
 func _unpack(packet: PackedFloat32Array) -> InputFrame:
 	var frame := InputFrame.new()
-	frame.sequence = int(packet[0])
-	frame.move = Vector2(packet[1], packet[2])
-	frame.yaw = packet[3]
-	frame.pitch = packet[4]
-	frame.view_tick = packet[10]
-	var held := int(packet[5])
+	frame.sequence = int(packet[Field.SEQUENCE])
+	frame.move = Vector2(packet[Field.MOVE_X], packet[Field.MOVE_Y])
+	frame.yaw = packet[Field.YAW]
+	frame.pitch = packet[Field.PITCH]
+	frame.view_tick = packet[Field.VIEW_TICK]
+	var held := int(packet[Field.HELD])
 	frame.jump = held & HELD_JUMP != 0
 	frame.sprint = held & HELD_SPRINT != 0
 	frame.crouch = held & HELD_CROUCH != 0
