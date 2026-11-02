@@ -1,0 +1,6 @@
+[gd_resource type="Resource" script_class="ArmsPose" format=3 uid="uid://cshs4jtjw1m1f"]
+
+[ext_resource type="Script" path="res://scripts/player/arms_pose.gd" id="1_pose"]
+
+[resource]
+script = ExtResource("1_pose")

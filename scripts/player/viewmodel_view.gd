@@ -30,6 +30,20 @@ func bind(world: Camera3D) -> void:
 func _process(_delta: float) -> void:
 	if world_camera:
 		camera.global_transform = world_camera.global_transform
+		if camera.environment == null:
+			_copy_environment()
+
+
+## The viewmodel is lit like the world, but must not draw the world's background
+## (the sky colour would leak into the edge pixels as a halo): same environment with
+## a clear background, which the transparent viewport leaves empty.
+func _copy_environment() -> void:
+	var world_environment := world_camera.get_world_3d().environment
+	if world_environment == null:
+		return
+	var copy := world_environment.duplicate() as Environment
+	copy.background_mode = Environment.BG_CLEAR_COLOR
+	camera.environment = copy
 
 
 ## Puts `node` and everything visual below it on the viewmodel layer.
