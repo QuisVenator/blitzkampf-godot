@@ -40,6 +40,8 @@ enum Pose { TICK, POSITION, HEIGHT }
 const INTERPOLATION_DELAY_MS := 100
 ## The local player's prediction is corrected only when it differs from the server
 ## by more than this (metres); beyond SNAP_DISTANCE it is teleported instead.
+## How fast the clock estimate drifts towards later-arriving snapshots (per snapshot).
+const CLOCK_DRIFT := 0.02
 const RECONCILE_EPSILON := 0.02
 const RECONCILE_SNAP_DISTANCE := 2.0
 ## How fast the visible correction fades out (1/s).
@@ -118,6 +120,10 @@ var _synced := false
 ## Server: `Pose` entries (tick, position, capsule height) of this body after each of its recent ticks.
 var _pose_history: Array = []
 ## Predicting client: the newest snapshot's server tick and when it was due to arrive.
+## Newest snapshot tick seen, and the estimated `arrival - tick time` clock offset.
+var _newest_tick := -1.0
+var _clock_offset := 0.0
+var _clock_synced := false
 var _server_tick := 0.0
 var _server_tick_ms := 0
 var _replaying := false
@@ -448,17 +454,39 @@ func _publish_snapshot() -> void:
 func _receive_snapshot(data: PackedFloat32Array) -> void:
 	if data.size() != Snap.SIZE or NetSim.drops():
 		return
+	# The server sends on every frame it renders, which can be several times per
+	# physics tick: keep only the first copy of each tick.
+	var tick: float = data[Snap.TICK]
+	if tick <= _newest_tick:
+		return
+	_newest_tick = tick
 	var ready_ms := Time.get_ticks_msec() + NetSim.lag_ms
 	if is_local:
 		_snapshot_queue.append([ready_ms, data])
 		if _snapshot_queue.size() > MAX_BUFFERED_SNAPSHOTS:
 			_snapshot_queue.pop_front()
 		return
+	ready_ms = _steady_ms(tick, ready_ms)
 	stance = int(data[Snap.STANCE]) as Stance
 	_remote_on_floor = data[Snap.ON_FLOOR] > 0.5
 	_interpolation_buffer.append([ready_ms, _snap_vector(data, Snap.POS_X), data[Snap.YAW], data[Snap.PITCH], _snap_vector(data, Snap.VEL_X)])
 	if _interpolation_buffer.size() > MAX_BUFFERED_SNAPSHOTS:
 		_interpolation_buffer.pop_front()
+
+
+## When snapshot `tick` is due on this machine's clock. Snapshots reach us unevenly
+## (the server sends per rendered frame, the network adds jitter), so the arrival
+## time of each one would make remote players stutter. The ticks themselves are
+## evenly spaced: follow the earliest arrivals and drift slowly towards later ones.
+func _steady_ms(tick: float, arrival_ms: float) -> float:
+	var tick_ms := tick / TICKS_PER_MS
+	var offset := arrival_ms - tick_ms
+	if not _clock_synced or offset < _clock_offset:
+		_clock_offset = offset
+		_clock_synced = true
+	else:
+		_clock_offset += (offset - _clock_offset) * CLOCK_DRIFT
+	return tick_ms + _clock_offset
 
 
 ## Three consecutive snapshot floats starting at `first` as a vector.

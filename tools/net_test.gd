@@ -8,6 +8,7 @@ extends SceneTree
 
 ## [scenario name, client count, extra client args, server args]
 const SCENARIOS := [
+	["remote_smooth", 1, [], ["--server"]],
 	["connect", 1, [], ["--server"]],
 	["two_clients", 2, [], ["--server"]],
 	["shoot", 2, [], ["--server"]],
