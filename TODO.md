@@ -35,6 +35,7 @@ Rough order of intent, not a commitment. Tick items off (and move them to Done) 
 
 ## Done
 - [x] Third-person character model (Quaternius mannequin) with animation tree, held weapons and replicated held-weapon ids
+- [x] On-screen pickup prompt (`WeaponManager.pickup_hint_changed` -> HUD `PickupLabel`; shows F/G choices when a one-handed weapon meets a one-handed primary)
 - [x] Positional sounds for other players (shots, reloads, pickups, jumps, footsteps)
 - [x] Debug console (F1) with give/damage/heal/kill/tp/bot commands; simple AI bots (`BotInput`); `console` net scenario
 - [x] M4 Smooth feel: `NetSim` lag/loss flags, remote-player interpolation, client prediction + reconciliation (`prediction` net scenario)

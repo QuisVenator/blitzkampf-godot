@@ -26,6 +26,9 @@ signal fired(definition: WeaponDefinition)
 signal reload_started(definition: WeaponDefinition)
 signal hit_confirmed
 signal picked_up
+## The local player's nearest pickup in reach changed (null when none). With
+## `choice` both hands are possible, so F and G do different things.
+signal pickup_hint_changed(definition: WeaponDefinition, choice: bool)
 ## A sound made by *another* player's weapon, to be played at `position` (the
 ## owner hears their own through the signals above). Emitted on every peer.
 signal heard(sound: StringName, position: Vector3, pitch: float)
@@ -67,6 +70,8 @@ var secondary: WeaponSlot
 
 var _slots: Array[WeaponSlot] = []
 var _frame := InputFrame.new()
+var _hint_definition: WeaponDefinition
+var _hint_choice := false
 ## Slots waiting for the reload in progress to finish (left hand goes first).
 var _reload_queue: Array[int] = []
 var _crosshair_spread_deg := -1.0
@@ -202,8 +207,11 @@ func _physics_process(delta: float) -> void:
 	if not _player.is_multiplayer_authority():
 		if _player.is_local:
 			_predict_feedback(delta)
+			_update_pickup_hint()
 		return
 	_frame = _player.input.frame()
+	if _player.is_local:
+		_update_pickup_hint()
 	_update_aiming()
 	_update_spread()
 	if not _player.alive:
@@ -493,6 +501,19 @@ func _try_pickup(replace_primary: bool) -> void:
 	best.collect()
 	picked_up.emit()
 	_announce(&"pickup")
+
+
+## Tells the HUD what F/G would take right now. Uses the same reach test as the
+## pickup itself, on this machine's view of the world (the server decides).
+func _update_pickup_hint() -> void:
+	var best := _find_pickup() if _player.alive else null
+	var definition := best.definition if best else null
+	var choice := best != null and best.definition.one_handed and not primary.is_empty() and primary.definition.one_handed
+	if definition == _hint_definition and choice == _hint_choice:
+		return
+	_hint_definition = definition
+	_hint_choice = choice
+	pickup_hint_changed.emit(definition, choice)
 
 
 func _find_pickup() -> PickupArea:

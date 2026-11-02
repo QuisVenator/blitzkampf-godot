@@ -23,6 +23,7 @@ var _tick_count := 0
 @onready var _weapon_label: Label = $Root/Info/WeaponLabel
 @onready var _ammo_label: Label = $Root/Info/AmmoLabel
 @onready var _stats_label: Label = $Root/StatsLabel
+@onready var _pickup_label: Label = $Root/PickupLabel
 @onready var _debug_label: Label = $Root/DebugLabel
 
 
@@ -34,6 +35,7 @@ func bind(player: Player, weapons: WeaponManager) -> void:
 	weapons.reloading_changed.connect(_on_reloading_changed)
 	weapons.spread_changed.connect(_crosshair.set_spread)
 	weapons.hit_confirmed.connect(_on_hit_confirmed)
+	weapons.pickup_hint_changed.connect(_on_pickup_hint_changed)
 	player.health_changed.connect(_on_health_changed)
 	_on_health_changed(player.health, player.max_health)
 
@@ -81,6 +83,25 @@ func _on_ammo_changed(slot: int, in_mag: int, reserve: int) -> void:
 func _on_reloading_changed(slot: int, reloading: bool) -> void:
 	_reloading[slot] = reloading
 	_update_ammo()
+
+
+func _on_pickup_hint_changed(definition: WeaponDefinition, choice: bool) -> void:
+	_pickup_label.visible = definition != null
+	if definition == null:
+		return
+	var take := _key_name(&"interact")
+	var replace := _key_name(&"interact_alt")
+	if choice:
+		_pickup_label.text = "[%s] Take %s as second weapon\n[%s] Replace primary with %s" % [take, definition.display_name, replace, definition.display_name]
+	else:
+		_pickup_label.text = "[%s] Pick up %s" % [take, definition.display_name]
+
+
+## The first bound key of an action as text, for prompts.
+func _key_name(action: StringName) -> String:
+	for event in InputMap.action_get_events(action):
+		return event.as_text().replace(" (Physical)", "")
+	return "?"
 
 
 func _on_health_changed(health: int, max_health: int) -> void:

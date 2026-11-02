@@ -7,6 +7,8 @@ var _failures := 0
 var _main: Node
 var _player: Player
 var _weapons: WeaponManager
+var _hint_definition: WeaponDefinition
+var _hint_choice := false
 var _hits := 0
 
 
@@ -20,6 +22,9 @@ func _run() -> void:
 	_player = _main.local_player
 	_weapons = _player.get_node("WeaponManager")
 	_weapons.hit_confirmed.connect(func() -> void: _hits += 1)
+	_weapons.pickup_hint_changed.connect(func(d: WeaponDefinition, c: bool) -> void:
+		_hint_definition = d
+		_hint_choice = c)
 	GameInput.force_active = true
 
 	await _frames(30)
@@ -103,6 +108,7 @@ func _run() -> void:
 	# Pickup from a spawner that only offers shotguns at (10, 0.04, -12).
 	_player.teleport(Vector3(10, 0, -11), 0.0)
 	await _frames(10)
+	_check("prompt names the shotgun in reach", _hint_definition != null and _hint_definition.id == &"shotgun" and not _hint_choice)
 	Input.action_press(&"interact")
 	await _frames(2)
 	Input.action_release(&"interact")
@@ -168,6 +174,7 @@ func _test_akimbo() -> void:
 
 	_spawn_dropped(smg, 10, 20)
 	await _frames(20)
+	_check("prompt offers a choice for a one-handed weapon", _hint_definition == smg and _hint_choice)
 	await _press(&"interact")
 	_check("F adds a second one-handed weapon", _weapons.is_akimbo() and _weapons.secondary.definition == smg)
 	_check("secondary keeps its ammo", _weapons.secondary.in_mag == 10 and _weapons.secondary.reserve == 20)

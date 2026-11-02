@@ -77,6 +77,22 @@ theme_override_font_sizes/font_size = 12
 text = "FPS: 0 | Tick: 0"
 horizontal_alignment = 2
 
+[node name="PickupLabel" type="Label" parent="Root"]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = 70.0
+offset_right = 200.0
+offset_bottom = 120.0
+grow_horizontal = 2
+text = "[F] Pick up"
+horizontal_alignment = 1
+
 [node name="DebugLabel" type="Label" parent="Root"]
 visible = false
 layout_mode = 1
