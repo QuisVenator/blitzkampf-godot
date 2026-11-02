@@ -2,12 +2,14 @@
 
 [ext_resource type="Script" uid="uid://c81724s2lmmit" path="res://scripts/weapons/weapon_definition.gd" id="1_script"]
 [ext_resource type="PackedScene" path="res://scenes/weapons/smg_model.tscn" id="2_model"]
+[ext_resource type="PackedScene" path="res://scenes/weapons/smg_viewmodel.tscn" id="vm_smg"]
 
 [resource]
 script = ExtResource("1_script")
 id = &"smg"
 display_name = "SMG"
 model = ExtResource("2_model")
+viewmodel = ExtResource("vm_smg")
 one_handed = true
 fire_cooldown = 0.1
 fire_pitch_scale = 1.35

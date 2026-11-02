@@ -104,6 +104,7 @@ func _ready() -> void:
 		primary = WeaponSlot.new(null)
 		secondary = WeaponSlot.new(null)
 	_slots = [primary, secondary]
+	reloading_changed.connect(_on_reloading_changed)
 	_show_holders(true)
 	_player.died.connect(_on_player_died)
 	_player.respawned.connect(_on_player_respawned)
@@ -429,9 +430,37 @@ func _apply_spread(forward: Vector3, basis: Basis, spread_deg: float, rng: Rando
 	return (forward * cos(cone) + basis.x * sin(cone) * cos(spin) + basis.y * sin(cone) * sin(spin)).normalized()
 
 
-## Kicks the model itself (not the holder), so recoil never fights the aim tween.
+## Plays an animation of the slot's viewmodel scene, if it has one.
+func _play_viewmodel(slot: WeaponSlot, animation: StringName, duration := 0.0) -> void:
+	var scene := slot.viewmodel as WeaponViewmodel
+	if scene:
+		scene.play(animation, duration)
+
+
+## With two weapons each hand has its own gun (the left one mirrored); a lone
+## weapon is held with both hands.
+func _update_hands() -> void:
+	for slot in _slots:
+		var scene := slot.viewmodel as WeaponViewmodel
+		if scene:
+			scene.set_akimbo(is_akimbo(), slot == secondary)
+
+
+func _on_reloading_changed(slot_index: int, reloading: bool) -> void:
+	var slot := _slots[slot_index]
+	if reloading and slot.definition:
+		_play_viewmodel(slot, &"reload", slot.definition.reload_duration)
+
+
+## Kicks the weapon: the viewmodel scene's own "fire" animation if it has one, else
+## the bare model by a tween (not the holder, so recoil never fights the aim tween).
 func _kick_recoil(slot: WeaponSlot) -> void:
 	if slot.viewmodel == null:
+		return
+	var scene := slot.viewmodel as WeaponViewmodel
+	var ads_animation: StringName = &"fire_ads" if _aiming and slot == primary else &"fire"
+	if scene and scene.has_animation(ads_animation):
+		scene.play(ads_animation)
 		return
 	if slot.recoil_tween:
 		slot.recoil_tween.kill()
@@ -489,9 +518,12 @@ func _rebuild_viewmodel(slot: WeaponSlot) -> void:
 		slot.viewmodel.queue_free()
 		slot.viewmodel = null
 	if slot.definition and slot.holder:
-		slot.viewmodel = slot.definition.model.instantiate()
+		var scene := slot.definition.viewmodel if slot.definition.viewmodel else slot.definition.model
+		slot.viewmodel = scene.instantiate()
 		ViewmodelView.assign_layer(slot.viewmodel)
 		slot.holder.add_child(slot.viewmodel)
+		_play_viewmodel(slot, &"draw")
+	_update_hands()
 
 
 ## `replace_primary` is the G key. Where an incoming weapon goes:

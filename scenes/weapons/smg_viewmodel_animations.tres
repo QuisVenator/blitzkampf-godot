@@ -1,0 +1,117 @@
+[gd_resource type="AnimationLibrary" format=3]
+
+[sub_resource type="Animation" id="Animation_myica"]
+length = 0.3
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Rig:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.3),
+"transitions": PackedFloat32Array(0.4, 0.4),
+"update": 0,
+"values": [Vector3(0.02, -0.25, 0.1), Vector3(0, 0, 0)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("Rig:rotation")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.3),
+"transitions": PackedFloat32Array(0.4, 0.4),
+"update": 0,
+"values": [Vector3(-0.7853982, 0, 0.17453292), Vector3(0, 0, 0)]
+}
+
+[sub_resource type="Animation" id="Animation_uhcjv"]
+length = 0.2
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Rig:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.04, 0.2),
+"transitions": PackedFloat32Array(0.4, 0.4, 0.4),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0, 0.005, 0.07), Vector3(0, 0, 0)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("Rig:rotation")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.04, 0.2),
+"transitions": PackedFloat32Array(0.4, 0.4, 0.4),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0.06981317, 0, 0), Vector3(0, 0, 0)]
+}
+
+[sub_resource type="Animation" id="Animation_u53be"]
+length = 0.2
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Rig:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.04, 0.2),
+"transitions": PackedFloat32Array(0.4, 0.4, 0.4),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0, 0.005, 0.025), Vector3(0, 0, 0)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("Rig:rotation")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.04, 0.2),
+"transitions": PackedFloat32Array(0.4, 0.4, 0.4),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0.02617994, 0, 0), Vector3(0, 0, 0)]
+}
+
+[sub_resource type="Animation" id="Animation_mv2cx"]
+length = 1.2
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Rig:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.25, 0.9, 1.2),
+"transitions": PackedFloat32Array(0.4, 0.4, 0.4, 0.4),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0, -0.06, 0.03), Vector3(0, -0.06, 0.03), Vector3(0, 0, 0)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("Rig:rotation")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.25, 0.9, 1.2),
+"transitions": PackedFloat32Array(0.4, 0.4, 0.4, 0.4),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(-0.34906584, 0, 0.2617994), Vector3(-0.34906584, 0, 0.2617994), Vector3(0, 0, 0)]
+}
+
+[resource]
+_data = {
+&"draw": SubResource("Animation_myica"),
+&"fire": SubResource("Animation_uhcjv"),
+&"fire_ads": SubResource("Animation_u53be"),
+&"reload": SubResource("Animation_mv2cx")
+}

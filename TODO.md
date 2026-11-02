@@ -5,7 +5,8 @@ Rough order of intent, not a commitment. Tick items off (and move them to Done) 
 ## Next up
 - [ ] Pause menu: add more options (mouse sensitivity, volume, key rebinding, akimbo button scheme)
 - [ ] Movement ideas (collect and estimate; tune via `MovementSettings` / `QuakeMovement`)
-- [ ] Reload animation (viewmodel; left hand first when akimbo)
+- [ ] Polish the viewmodel animations (draw, fire, reload exist as a basic start; hand/slide movement, easing, per-weapon differences) and add a mouse-sway like the tutorial's
+- [ ] Tune the viewmodel hand poses in the editor (`scenes/weapons/*_viewmodel.tscn`, use the PreviewCamera); the left hand of the SMG/shotgun and akimbo especially
 - [ ] Sniper weapons: scope overlay, higher zoom, hidden viewmodel while scoped (new `WeaponDefinition` mode, not a code branch)
 
 ## Multiplayer path (plan: server-authoritative, ENet, listen-server + headless dedicated; see AGENTS.md when it lands)
@@ -18,7 +19,7 @@ Rough order of intent, not a commitment. Tick items off (and move them to Done) 
 - [ ] Player hitbox (together with health/damage)
 - [ ] Melee weapons (close-range hit shape, swing animations; may need a weapon-slot rethink)
 - [ ] Multiplayer (Godot high-level multiplayer; server-authoritative pickups, ammo, hits, spread)
-- [ ] Real audio, more maps, optional viewmodel `SubViewport`
+- [ ] Real audio, more maps
 
 ## Ideas / open questions
 - [ ] Make the akimbo button scheme configurable (LMB/RMB roles are separate Input Map actions)
@@ -29,11 +30,11 @@ Rough order of intent, not a commitment. Tick items off (and move them to Done) 
 - [ ] Lighting is dimmer than the three.js original
 
 ## Character follow-ups
-- [ ] First-person arms in the viewmodel (instead of the floating gun)
 - [ ] Better animations: strafe/backwards locomotion, slide, reload/shoot/hit reactions, two-handed poses for the shotgun, akimbo arm poses (Universal Animation Library Pro or Universal Base Characters for a nicer mesh)
 - [ ] Footstep/hit-reaction sync, head hitbox (Hit_Head animation exists)
 
 ## Done
+- [x] First-person hands and a viewmodel camera: segmented hands (`tools/make_hands.py`), one editor-authored viewmodel scene per weapon (gun + hands + AnimationPlayer), viewmodel rendered by its own camera in a SubViewport
 - [x] Third-person character model (Quaternius mannequin) with animation tree, held weapons and replicated held-weapon ids
 - [x] On-screen pickup prompt (`WeaponManager.pickup_hint_changed` -> HUD `PickupLabel`; shows F/G choices when a one-handed weapon meets a one-handed primary)
 - [x] Positional sounds for other players (shots, reloads, pickups, jumps, footsteps)

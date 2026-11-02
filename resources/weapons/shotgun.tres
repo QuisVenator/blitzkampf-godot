@@ -2,12 +2,14 @@
 
 [ext_resource type="Script" uid="uid://c81724s2lmmit" path="res://scripts/weapons/weapon_definition.gd" id="1_script"]
 [ext_resource type="PackedScene" path="res://scenes/weapons/shotgun_model.tscn" id="2_model"]
+[ext_resource type="PackedScene" path="res://scenes/weapons/shotgun_viewmodel.tscn" id="vm_shotgun"]
 
 [resource]
 script = ExtResource("1_script")
 id = &"shotgun"
 display_name = "Shotgun"
 model = ExtResource("2_model")
+viewmodel = ExtResource("vm_shotgun")
 fire_cooldown = 0.6
 fire_pitch_scale = 0.7
 ads_fov = 68.0

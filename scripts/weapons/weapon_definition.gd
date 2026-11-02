@@ -9,6 +9,9 @@ extends Resource
 ## "Muzzle" Marker3D (tracer origin) and a "Sight" Marker3D (the point that
 ## lines up with the screen centre while aiming down sights).
 @export var model: PackedScene
+## First-person scene (a `WeaponViewmodel`: gun, hands and animations). The viewmodel
+## falls back to `model` when this is empty.
+@export var viewmodel: PackedScene
 
 ## One-handed weapons can be wielded in pairs (akimbo); the rest need both hands.
 @export var one_handed := false
