@@ -91,8 +91,9 @@ var alive := true:
 		if is_node_ready():
 			_on_alive_changed()
 
-## Server state for everyone, published each tick by the server (see `_publish_snapshot`).
-## Layout: [ack sequence, position xyz, velocity xyz, yaw, pitch, stance, slide time, on floor].
+## Server state for everyone, published each tick by the server (see `_publish_snapshot`;
+## sent by RPC, not through `StateSync`, so it goes out exactly once per physics tick).
+## Layout: see `Snap`.
 var snapshot := PackedFloat32Array():
 	set(value):
 		snapshot = value
@@ -113,6 +114,8 @@ var held_secondary := &"":
 var _frame := InputFrame.new()
 ## Remote players: last replicated "on the floor" flag (their body isn't simulated here).
 var _remote_on_floor := true
+## Server: peers that have asked for this player's snapshots (see `_rpc_want_snapshots`).
+var _snapshot_peers: Array[int] = []
 var _snapshot_queue: Array = []  # predicting client: [ready ms, snapshot] (`Queued`)
 var _interpolation_buffer: Array = []  # remote player on a client, `Blend` layout
 var _history: Array = []  # predicting client, `Step` layout: sequence, InputFrame, position after the step
@@ -159,6 +162,8 @@ func _ready() -> void:
 		camera.clear_current()
 	# Only the simulating side moves the body in physics ticks; elsewhere the
 	# replicated position is applied as it arrives, so don't interpolate it.
+	if not is_multiplayer_authority():
+		_rpc_want_snapshots.rpc_id(1)
 	if not is_multiplayer_authority() and not is_local:
 		physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	_update_camera()
@@ -433,7 +438,8 @@ func _track_footsteps(has_wish: bool, delta: float) -> void:
 
 # --- Networking -------------------------------------------------------------
 
-## Server: publishes the body's state for all peers (replicated by `StateSync`).
+## Server: publishes the body's state, once per physics tick, to every peer that has
+## this player.
 func _publish_snapshot() -> void:
 	var tick := Engine.get_physics_frames()
 	snapshot = PackedFloat32Array([
@@ -444,9 +450,29 @@ func _publish_snapshot() -> void:
 		tick,
 	])
 	assert(snapshot.size() == Snap.SIZE)
+	var connected := multiplayer.get_peers()
+	for peer in _snapshot_peers.duplicate():
+		if connected.has(peer):
+			_rpc_snapshot.rpc_id(peer, snapshot)
+		else:
+			_snapshot_peers.erase(peer)
 	_pose_history.append([tick, global_position, _capsule.height])
 	if _pose_history.size() > POSE_HISTORY_TICKS:
 		_pose_history.pop_front()
+
+
+## Client: its copy of this player exists now, so the server may start sending it
+## snapshots (earlier ones would hit a node that isn't there yet).
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_want_snapshots() -> void:
+	var peer := multiplayer.get_remote_sender_id()
+	if is_multiplayer_authority() and not _snapshot_peers.has(peer):
+		_snapshot_peers.append(peer)
+
+
+@rpc("authority", "call_remote", "unreliable_ordered")
+func _rpc_snapshot(data: PackedFloat32Array) -> void:
+	snapshot = data
 
 
 ## Client: a snapshot arrived (after the simulated lag, if any, for the predicting
