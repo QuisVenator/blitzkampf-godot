@@ -5,6 +5,9 @@ extends Resource
 
 @export var id: StringName
 @export var display_name := ""
+## Which bit of a TrenchBroom weapon spawner's weapon checkboxes this weapon owns (0-23, unique).
+## Never reuse or change one once maps use it. Rerun `tools/make_map_resources.gd` after adding a weapon.
+@export_range(0, 23) var map_bit := 0
 ## Scene used for the viewmodel, pickups and drops. Barrel along -Z, with a
 ## "Muzzle" Marker3D (tracer origin) and a "Sight" Marker3D (the point that
 ## lines up with the screen centre while aiming down sights).

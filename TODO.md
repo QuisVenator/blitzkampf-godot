@@ -20,6 +20,8 @@ Rough order of intent, not a commitment. Tick items off (and move them to Done) 
 - [ ] Player hitbox (together with health/damage)
 - [ ] Melee weapons (close-range hit shape, swing animations; may need a weapon-slot rethink)
 - [ ] Multiplayer (Godot high-level multiplayer; server-authoritative pickups, ammo, hits, spread)
+- [x] TrenchBroom maps via FuncGodot: runtime build, map selector, player/weapon spawner/target/sun/environment entities, starter `maps/test_arena.map`
+- [ ] More TrenchBroom entities (props, doors, triggers, jump pads, bot navigation hints) and a real second map
 - [ ] Real audio, more maps
 
 ## Ideas / open questions

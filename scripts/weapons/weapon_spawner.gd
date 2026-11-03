@@ -29,6 +29,7 @@ var _shown_index := -1
 @onready var _spinner: Node3D = $Marker/Spinner
 @onready var _pickup: PickupArea = $PickupArea
 @onready var _respawn_timer: Timer = $RespawnTimer
+@onready var _sync: MultiplayerSynchronizer = $Sync
 
 
 func _ready() -> void:
@@ -37,6 +38,28 @@ func _ready() -> void:
 	_respawn_timer.wait_time = respawn_delay
 	_respawn_timer.timeout.connect(_roll_offer)
 	_start_animation()
+	if is_multiplayer_authority():
+		# Nobody sees the replicated state until their client has built the map (`show_to`).
+		_sync.public_visibility = false
+		_roll_offer()
+	_refresh()
+
+
+## Server: starts replicating this spawner to `peer` (its client has the map now).
+func show_to(peer: int) -> void:
+	_sync.set_visibility_for(peer, true)
+
+
+## Called by FuncGodot right after a TrenchBroom `weapon_spawner` entity became this node
+## (after `_ready`). `weapons` is a bit mask over `WeaponDefinition.map_bit`; no bit set = every weapon.
+func _func_godot_apply_properties(properties: Dictionary) -> void:
+	respawn_delay = properties.get("respawn_delay", respawn_delay)
+	_respawn_timer.wait_time = respawn_delay
+	var mask: int = properties.get("weapons", 0)
+	offers = []
+	for definition in WeaponCatalog.get_default().weapons:
+		if mask == 0 or mask & (1 << definition.map_bit):
+			offers.append(definition)
 	if is_multiplayer_authority():
 		_roll_offer()
 	_refresh()

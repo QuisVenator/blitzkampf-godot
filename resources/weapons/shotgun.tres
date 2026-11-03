@@ -8,6 +8,7 @@
 script = ExtResource("1_script")
 id = &"shotgun"
 display_name = "Shotgun"
+map_bit = 2
 model = ExtResource("2_model")
 viewmodel = ExtResource("vm_shotgun")
 fire_cooldown = 0.6

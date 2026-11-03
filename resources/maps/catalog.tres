@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="MapCatalog" format=3]
+
+[ext_resource type="Script" path="res://scripts/maps/map_catalog.gd" id="1_catalog"]
+[ext_resource type="Script" path="res://scripts/maps/map_definition.gd" id="2_definition"]
+[ext_resource type="PackedScene" path="res://scenes/maps/test_arena.tscn" id="3_arena"]
+
+[sub_resource type="Resource" id="Resource_arena"]
+script = ExtResource("2_definition")
+id = &"test_arena"
+display_name = "Test arena"
+scene = ExtResource("3_arena")
+
+[sub_resource type="Resource" id="Resource_arena_map"]
+script = ExtResource("2_definition")
+id = &"test_arena_map"
+display_name = "Test arena (TrenchBroom)"
+map_file = "res://maps/test_arena.map"
+
+[resource]
+script = ExtResource("1_catalog")
+maps = Array[ExtResource("2_definition")]([SubResource("Resource_arena"), SubResource("Resource_arena_map")])

@@ -1,0 +1,99 @@
+[gd_resource type="Resource" script_class="FuncGodotFGDFile" format=3]
+
+[ext_resource type="Resource" path="res://addons/func_godot/fgd/func_godot_fgd.tres" id="1_w2hqi"]
+[ext_resource type="Script" path="res://addons/func_godot/src/fgd/func_godot_fgd_point_class_display_descriptor.gd" id="2_sgar7"]
+[ext_resource type="Script" path="res://addons/func_godot/src/fgd/func_godot_fgd_point_class.gd" id="3_feav3"]
+[ext_resource type="PackedScene" path="res://scenes/weapons/weapon_spawner.tscn" id="4_yy4wf"]
+[ext_resource type="PackedScene" path="res://scenes/world/target.tscn" id="5_yabnh"]
+[ext_resource type="Script" path="res://addons/func_godot/src/fgd/func_godot_fgd_file.gd" id="6_tmhvw"]
+
+[sub_resource type="Resource" id="Resource_f8ner"]
+script = ExtResource("3_feav3")
+classname = "player_spawn"
+description = "Where players appear. Place it on the floor; the arrow shows where they look."
+class_properties = Dictionary[String, Variant]({
+"angle": 0.0
+})
+class_property_descriptions = Dictionary[String, Variant]({
+"angle": "Facing (yaw, degrees)"
+})
+meta_properties = Dictionary[String, Variant]({
+"color": Color(0.2, 0.9, 0.3, 1),
+"size": AABB(-16, -16, 0, 16, 16, 58)
+})
+node_class = "Marker3D"
+node_groups = Array[String](["player_spawn"])
+
+[sub_resource type="Resource" id="Resource_nephk"]
+script = ExtResource("3_feav3")
+scene_file = ExtResource("4_yy4wf")
+classname = "weapon_spawner"
+description = "Offers one of the ticked weapons (none ticked = all) and offers another after it was taken."
+class_properties = Dictionary[String, Variant]({
+"respawn_delay": 8.0,
+"weapons": [["Pistol", 1, 1], ["SMG", 2, 1], ["Shotgun", 4, 1]]
+})
+class_property_descriptions = Dictionary[String, Variant]({
+"respawn_delay": "Seconds until a new weapon appears"
+})
+meta_properties = Dictionary[String, Variant]({
+"color": Color(1, 0.6, 0.1, 1),
+"size": AABB(-16, -16, 0, 16, 16, 16)
+})
+
+[sub_resource type="Resource" id="Resource_ykobj"]
+script = ExtResource("3_feav3")
+scene_file = ExtResource("5_yabnh")
+classname = "target"
+description = "A practice target (a sphere that flashes when hit). The origin is its centre."
+meta_properties = Dictionary[String, Variant]({
+"color": Color(1, 0.2, 0.2, 1),
+"size": AABB(-16, -16, -16, 16, 16, 16)
+})
+
+[sub_resource type="Resource" id="Resource_7p2fu"]
+script = ExtResource("3_feav3")
+classname = "env_sun"
+description = "Directional light. Pitch Yaw Roll in 'angles': pitch 90 shines straight down."
+class_properties = Dictionary[String, Variant]({
+"angles": Vector3(50, 45, 0),
+"color": Color(1, 1, 1, 1),
+"energy": 1.0,
+"shadows": false
+})
+class_property_descriptions = Dictionary[String, Variant]({
+"angles": "Pitch Yaw Roll",
+"energy": "Light energy",
+"shadows": "Cast shadows"
+})
+meta_properties = Dictionary[String, Variant]({
+"color": Color(1, 0.9, 0.3, 1),
+"size": AABB(-8, -8, -8, 8, 8, 8)
+})
+node_class = "MapSun"
+
+[sub_resource type="Resource" id="Resource_5xq5x"]
+script = ExtResource("3_feav3")
+classname = "env_world"
+description = "Sky colour and ambient light. One per map."
+class_properties = Dictionary[String, Variant]({
+"ambient_color": Color(0.85, 0.85, 0.9, 1),
+"ambient_energy": 1.0,
+"sky_color": Color(0.529, 0.808, 0.922, 1)
+})
+class_property_descriptions = Dictionary[String, Variant]({
+"ambient_color": "Flat ambient light colour",
+"ambient_energy": "Ambient light energy",
+"sky_color": "Background colour"
+})
+meta_properties = Dictionary[String, Variant]({
+"color": Color(0.4, 0.7, 1, 1),
+"size": AABB(-8, -8, -8, 8, 8, 8)
+})
+node_class = "MapEnvironment"
+
+[resource]
+script = ExtResource("6_tmhvw")
+fgd_name = "Blitzkampf"
+base_fgd_files = Array[Resource]([ExtResource("1_w2hqi")])
+entity_definitions = Array[Resource]([SubResource("Resource_f8ner"), SubResource("Resource_nephk"), SubResource("Resource_ykobj"), SubResource("Resource_7p2fu"), SubResource("Resource_5xq5x")])

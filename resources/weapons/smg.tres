@@ -8,6 +8,7 @@
 script = ExtResource("1_script")
 id = &"smg"
 display_name = "SMG"
+map_bit = 1
 model = ExtResource("2_model")
 viewmodel = ExtResource("vm_smg")
 one_handed = true

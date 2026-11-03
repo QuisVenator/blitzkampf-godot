@@ -10,6 +10,7 @@ extends SceneTree
 const SCENARIOS := [
 	["remote_smooth", 1, [], ["--server"]],
 	["connect", 1, [], ["--server"]],
+	["map_sync", 1, [], ["--server", "--map=test_arena_map"]],
 	["two_clients", 2, [], ["--server"]],
 	["shoot", 2, [], ["--server"]],
 	["weapons", 1, [], ["--server"]],

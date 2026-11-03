@@ -5,7 +5,7 @@ extends Node
 ## single player, so gameplay code has no single-player special case.
 ##
 ## Command-line options (after `--`): `--host`, `--server` (dedicated, headless),
-## `--join=<address>`, `--port=<n>`, `--cheats` (clients may use console commands), `--net-lag=<ms>` / `--net-loss=<percent>` (see
+## `--join=<address>`, `--port=<n>`, `--map=<id>`, `--cheats` (clients may use console commands), `--net-lag=<ms>` / `--net-loss=<percent>` (see
 ## `NetSim`), `--scenario=<name>` (network tests).
 
 enum Role { OFFLINE, HOST, SERVER, CLIENT }
@@ -15,7 +15,7 @@ const MAX_CLIENTS := 8
 const REJECT_GRACE := 0.2
 
 ## A client is accepted only when this matches the server's (builds must agree).
-var protocol_version := 10
+var protocol_version := 11
 
 var role := Role.OFFLINE
 var address := "127.0.0.1"
@@ -23,6 +23,9 @@ var port := DEFAULT_PORT
 ## Something went wrong joining or hosting; the main menu shows it.
 var last_error := ""
 var scenario := ""
+## Which map to play (`MapDefinition.id`; empty = the catalog's first). Chosen in the menu or with
+## `--map=<id>`; a client takes the server's.
+var map_id: StringName = &""
 ## Remote clients may run console commands (`--cheats`). The host and single
 ## player always may.
 var cheats := false
@@ -31,12 +34,18 @@ var cli_autostart := false
 
 ## Server side: a client passed the handshake / left after passing it.
 signal player_joined(peer_id: int)
+## Client side: the server told us which map is being played (`map_id` is set); the game
+## builds it and answers with `map_loaded()`.
+signal map_received(id: StringName)
 signal player_left(peer_id: int)
 ## Client side: the game can't continue (connection failed, dropped or rejected).
 signal connection_lost(reason: String)
 
 var _args := {}
 var _joined: Array[int] = []
+## Server side: peers that passed the version check and were told the map, but have not
+## said they built it yet (a peer only joins, and gets replicated state, after that).
+var _welcomed: Array[int] = []
 
 
 func _ready() -> void:
@@ -45,6 +54,7 @@ func _ready() -> void:
 		_args[parts[0]] = parts[1] if parts.size() > 1 else "true"
 	port = int(_args.get("port", DEFAULT_PORT))
 	scenario = _args.get("scenario", "")
+	map_id = StringName(_args.get("map", ""))
 	cheats = _args.has("cheats")
 	protocol_version = int(_args.get("protocol", protocol_version))
 	NetSim.lag_ms = int(_args.get("net-lag", "0"))
@@ -78,6 +88,7 @@ func is_online() -> bool:
 ## so replicated nodes can be found on both sides.
 func start() -> Error:
 	_joined.clear()
+	_welcomed.clear()
 	last_error = ""
 	var peer := ENetMultiplayerPeer.new()
 	var error := OK
@@ -105,6 +116,7 @@ func leave() -> void:
 	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
 	role = Role.OFFLINE
 	_joined.clear()
+	_welcomed.clear()
 
 
 func _on_connected_to_server() -> void:
@@ -116,6 +128,7 @@ func _on_peer_connected(_id: int) -> void:
 
 
 func _on_peer_disconnected(id: int) -> void:
+	_welcomed.erase(id)
 	if id in _joined:
 		_joined.erase(id)
 		player_left.emit(id)
@@ -131,6 +144,27 @@ func _hello(version: int) -> void:
 		await get_tree().create_timer(REJECT_GRACE).timeout
 		if is_online() and id in multiplayer.get_peers():
 			multiplayer.multiplayer_peer.disconnect_peer(id)
+		return
+	_welcomed.append(id)
+	_welcome.rpc_id(id, map_id)
+
+
+## Server to client after the version check: which map to build.
+@rpc("authority", "call_remote", "reliable")
+func _welcome(map: StringName) -> void:
+	map_id = map
+	map_received.emit(map)
+
+
+## Client: the map from `map_received` is built, the server may now spawn our player.
+func map_loaded() -> void:
+	_map_loaded.rpc_id(1)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _map_loaded() -> void:
+	var id := multiplayer.get_remote_sender_id()
+	if not multiplayer.is_server() or not id in _welcomed or id in _joined:
 		return
 	_joined.append(id)
 	player_joined.emit(id)

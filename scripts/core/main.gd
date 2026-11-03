@@ -5,6 +5,7 @@ extends Node3D
 ## `MultiplayerSpawner`, and wires the local player's signals to the HUD and sounds.
 
 const MENU_SCENE := "res://scenes/ui/main_menu.tscn"
+const MAP_SETTINGS := "res://resources/maps/map_settings.tres"
 const DROPPED_WEAPON_SCENE := preload("res://scenes/weapons/dropped_weapon.tscn")
 
 ## The player this machine's human controls (null on a dedicated server).
@@ -13,6 +14,7 @@ var local_player: Player
 var _next_bot_id := Player.BOT_ID_BASE
 var _commands := DebugCommands.new()
 
+@onready var _map: Node3D = $Map
 @onready var _players: Node3D = $Players
 @onready var _spawner: MultiplayerSpawner = $PlayerSpawner
 @onready var _drop_spawner: MultiplayerSpawner = $DropSpawner
@@ -27,6 +29,11 @@ func _ready() -> void:
 	_players.child_entered_tree.connect(_on_player_entered)
 	_console.command_submitted.connect(submit_command)
 	Net.connection_lost.connect(_return_to_menu)
+	if Net.role == Net.Role.CLIENT:
+		# The server decides the map; replicated nodes need it built before they arrive.
+		Net.map_received.connect(_on_map_received)
+	else:
+		_load_map(Net.map_id)
 
 	if Net.start() != OK:
 		_return_to_menu.call_deferred(Net.last_error)
@@ -39,6 +46,36 @@ func _ready() -> void:
 			_spawner.spawn({"peer": 1})
 	if Net.scenario != "":
 		_start_scenario.call_deferred()
+
+
+## Puts the map into the `Map` node: a scene is instanced, a TrenchBroom `.map` is built by
+## FuncGodot (synchronously). Done before any player exists, so spawn markers and weapon
+## spawners are there when they are needed. An unknown id means the first map, unless
+## `strict` (a client asked for the server's map): then it fails. Sets `Net.map_id` to the
+## map actually loaded.
+func _load_map(id: StringName, strict := false) -> bool:
+	var catalog := MapCatalog.get_default()
+	var definition := catalog.find(id) if strict else catalog.find_or_default(id)
+	if definition == null:
+		return false
+	Net.map_id = definition.id
+	if definition.scene:
+		_map.add_child(definition.scene.instantiate())
+		return true
+	var builder := FuncGodotMap.new()
+	builder.name = "MapBuilder"  # replicated nodes below it are found by path, so no auto-generated name
+	builder.map_settings = load(MAP_SETTINGS)
+	builder.local_map_file = definition.map_file
+	_map.add_child(builder)
+	builder.build()
+	return true
+
+
+func _on_map_received(id: StringName) -> void:
+	if _load_map(id, true):
+		Net.map_loaded()
+	else:
+		_return_to_menu("The server plays the map '%s', which this version does not have" % id)
 
 
 ## Runs on every peer with the same data, so the replicated tree matches.
@@ -113,6 +150,8 @@ func _rpc_output(text: String) -> void:
 
 
 func _on_peer_joined(peer: int) -> void:
+	# The peer built the map, so the map's replicated nodes can reach it now.
+	get_tree().call_group(&"weapon_spawner", "show_to", peer)
 	_spawner.spawn({"peer": peer})
 
 

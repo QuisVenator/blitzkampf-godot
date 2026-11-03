@@ -1,7 +1,6 @@
 [gd_scene format=3 uid="uid://ddnjis83xbe5y"]
 
 [ext_resource type="Script" uid="uid://bbtbdmmcgm4ib" path="res://scripts/core/main.gd" id="1_main"]
-[ext_resource type="PackedScene" uid="uid://b3cxlhq8kyt4b" path="res://scenes/maps/test_arena.tscn" id="2_arena"]
 [ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="4_hud"]
 [ext_resource type="Script" uid="uid://chvndphg3s0im" path="res://scripts/audio/sfx.gd" id="5_sfx"]
 [ext_resource type="PackedScene" path="res://scenes/ui/pause_menu.tscn" id="6_pause"]
@@ -11,7 +10,7 @@
 [node name="Main" type="Node3D"]
 script = ExtResource("1_main")
 
-[node name="TestArena" parent="." instance=ExtResource("2_arena")]
+[node name="Map" type="Node3D" parent="."]
 
 [node name="Players" type="Node3D" parent="."]
 
