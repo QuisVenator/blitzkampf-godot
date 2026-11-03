@@ -1,121 +1,156 @@
+// Game: Blitzkampf
+// Format: Standard
+// Generator: TrenchBroom 2026.2 (Build v2026.2 Release Linux)
+// entity 0
 {
 "classname" "worldspawn"
+"_tb_mod" "textures"
+// brush 0
 {
 ( -640 -640 -64 ) ( -640 640 -64 ) ( -640 -640 0 ) prototype/ground 0 0 0 1 1
-( 640 -640 -64 ) ( 640 -640 0 ) ( 640 640 -64 ) prototype/ground 0 0 0 1 1
 ( -640 -640 -64 ) ( -640 -640 0 ) ( 640 -640 -64 ) prototype/ground 0 0 0 1 1
-( -640 640 -64 ) ( 640 640 -64 ) ( -640 640 0 ) prototype/ground 0 0 0 1 1
 ( -640 -640 -64 ) ( 640 -640 -64 ) ( -640 640 -64 ) prototype/ground 0 0 0 1 1
 ( -640 -640 0 ) ( -640 640 0 ) ( 640 -640 0 ) prototype/ground 0 0 0 1 1
+( -640 640 -64 ) ( 640 640 -64 ) ( -640 640 0 ) prototype/ground 0 0 0 1 1
+( 640 -640 -64 ) ( 640 -640 0 ) ( 640 640 -64 ) prototype/ground 0 0 0 1 1
 }
+// brush 1
 {
 ( -192 128 0 ) ( -192 192 0 ) ( -192 128 48 ) prototype/blue 0 0 0 1 1
-( -128 128 0 ) ( -128 128 48 ) ( -128 192 0 ) prototype/blue 0 0 0 1 1
 ( -192 128 0 ) ( -192 128 48 ) ( -128 128 0 ) prototype/blue 0 0 0 1 1
-( -192 192 0 ) ( -128 192 0 ) ( -192 192 48 ) prototype/blue 0 0 0 1 1
 ( -192 128 0 ) ( -128 128 0 ) ( -192 192 0 ) prototype/blue 0 0 0 1 1
 ( -192 128 48 ) ( -192 192 48 ) ( -128 128 48 ) prototype/blue 0 0 0 1 1
+( -192 192 0 ) ( -128 192 0 ) ( -192 192 48 ) prototype/blue 0 0 0 1 1
+( -128 128 0 ) ( -128 128 48 ) ( -128 192 0 ) prototype/blue 0 0 0 1 1
 }
+// brush 2
 {
 ( 72 -240 0 ) ( 72 -144 0 ) ( 72 -240 64 ) prototype/green 0 0 0 1 1
-( 120 -240 0 ) ( 120 -240 64 ) ( 120 -144 0 ) prototype/green 0 0 0 1 1
 ( 72 -240 0 ) ( 72 -240 64 ) ( 120 -240 0 ) prototype/green 0 0 0 1 1
-( 72 -144 0 ) ( 120 -144 0 ) ( 72 -144 64 ) prototype/green 0 0 0 1 1
 ( 72 -240 0 ) ( 120 -240 0 ) ( 72 -144 0 ) prototype/green 0 0 0 1 1
 ( 72 -240 64 ) ( 72 -144 64 ) ( 120 -240 64 ) prototype/green 0 0 0 1 1
+( 72 -144 0 ) ( 120 -144 0 ) ( 72 -144 64 ) prototype/green 0 0 0 1 1
+( 120 -240 0 ) ( 120 -240 64 ) ( 120 -144 0 ) prototype/green 0 0 0 1 1
 }
+// brush 3
 {
 ( -336 -96 0 ) ( -336 96 0 ) ( -336 -96 32 ) prototype/yellow 0 0 0 1 1
-( -304 -96 0 ) ( -304 -96 32 ) ( -304 96 0 ) prototype/yellow 0 0 0 1 1
 ( -336 -96 0 ) ( -336 -96 32 ) ( -304 -96 0 ) prototype/yellow 0 0 0 1 1
-( -336 96 0 ) ( -304 96 0 ) ( -336 96 32 ) prototype/yellow 0 0 0 1 1
 ( -336 -96 0 ) ( -304 -96 0 ) ( -336 96 0 ) prototype/yellow 0 0 0 1 1
 ( -336 -96 32 ) ( -336 96 32 ) ( -304 -96 32 ) prototype/yellow 0 0 0 1 1
+( -336 96 0 ) ( -304 96 0 ) ( -336 96 32 ) prototype/yellow 0 0 0 1 1
+( -304 -96 0 ) ( -304 -96 32 ) ( -304 96 0 ) prototype/yellow 0 0 0 1 1
 }
+// brush 4
 {
 ( -280 -152 0 ) ( -280 -104 0 ) ( -280 -152 38 ) prototype/red 0 0 0 1 1
-( -232 -152 0 ) ( -232 -152 38 ) ( -232 -104 0 ) prototype/red 0 0 0 1 1
 ( -280 -152 0 ) ( -280 -152 38 ) ( -232 -152 0 ) prototype/red 0 0 0 1 1
-( -280 -104 0 ) ( -232 -104 0 ) ( -280 -104 38 ) prototype/red 0 0 0 1 1
 ( -280 -152 0 ) ( -232 -152 0 ) ( -280 -104 0 ) prototype/red 0 0 0 1 1
 ( -280 -152 38 ) ( -280 -104 38 ) ( -232 -152 38 ) prototype/red 0 0 0 1 1
+( -280 -104 0 ) ( -232 -104 0 ) ( -280 -104 38 ) prototype/red 0 0 0 1 1
+( -232 -152 0 ) ( -232 -152 38 ) ( -232 -104 0 ) prototype/red 0 0 0 1 1
 }
+// brush 5
 {
 ( -672 -672 0 ) ( -672 672 0 ) ( -672 -672 128 ) prototype/wall 0 0 0 1 1
-( -640 -672 0 ) ( -640 -672 128 ) ( -640 672 0 ) prototype/wall 0 0 0 1 1
 ( -672 -672 0 ) ( -672 -672 128 ) ( -640 -672 0 ) prototype/wall 0 0 0 1 1
-( -672 672 0 ) ( -640 672 0 ) ( -672 672 128 ) prototype/wall 0 0 0 1 1
 ( -672 -672 0 ) ( -640 -672 0 ) ( -672 672 0 ) prototype/wall 0 0 0 1 1
 ( -672 -672 128 ) ( -672 672 128 ) ( -640 -672 128 ) prototype/wall 0 0 0 1 1
+( -672 672 0 ) ( -640 672 0 ) ( -672 672 128 ) prototype/wall 0 0 0 1 1
+( -640 -672 0 ) ( -640 -672 128 ) ( -640 672 0 ) prototype/wall 0 0 0 1 1
 }
+// brush 6
 {
 ( 640 -672 0 ) ( 640 672 0 ) ( 640 -672 128 ) prototype/wall 0 0 0 1 1
-( 672 -672 0 ) ( 672 -672 128 ) ( 672 672 0 ) prototype/wall 0 0 0 1 1
 ( 640 -672 0 ) ( 640 -672 128 ) ( 672 -672 0 ) prototype/wall 0 0 0 1 1
-( 640 672 0 ) ( 672 672 0 ) ( 640 672 128 ) prototype/wall 0 0 0 1 1
 ( 640 -672 0 ) ( 672 -672 0 ) ( 640 672 0 ) prototype/wall 0 0 0 1 1
 ( 640 -672 128 ) ( 640 672 128 ) ( 672 -672 128 ) prototype/wall 0 0 0 1 1
+( 640 672 0 ) ( 672 672 0 ) ( 640 672 128 ) prototype/wall 0 0 0 1 1
+( 672 -672 0 ) ( 672 -672 128 ) ( 672 672 0 ) prototype/wall 0 0 0 1 1
 }
+// brush 7
 {
 ( -672 640 0 ) ( -672 672 0 ) ( -672 640 128 ) prototype/wall 0 0 0 1 1
-( 672 640 0 ) ( 672 640 128 ) ( 672 672 0 ) prototype/wall 0 0 0 1 1
 ( -672 640 0 ) ( -672 640 128 ) ( 672 640 0 ) prototype/wall 0 0 0 1 1
-( -672 672 0 ) ( 672 672 0 ) ( -672 672 128 ) prototype/wall 0 0 0 1 1
 ( -672 640 0 ) ( 672 640 0 ) ( -672 672 0 ) prototype/wall 0 0 0 1 1
 ( -672 640 128 ) ( -672 672 128 ) ( 672 640 128 ) prototype/wall 0 0 0 1 1
+( -672 672 0 ) ( 672 672 0 ) ( -672 672 128 ) prototype/wall 0 0 0 1 1
+( 672 640 0 ) ( 672 640 128 ) ( 672 672 0 ) prototype/wall 0 0 0 1 1
 }
+// brush 8
 {
 ( -672 -672 0 ) ( -672 -640 0 ) ( -672 -672 128 ) prototype/wall 0 0 0 1 1
-( 672 -672 0 ) ( 672 -672 128 ) ( 672 -640 0 ) prototype/wall 0 0 0 1 1
 ( -672 -672 0 ) ( -672 -672 128 ) ( 672 -672 0 ) prototype/wall 0 0 0 1 1
-( -672 -640 0 ) ( 672 -640 0 ) ( -672 -640 128 ) prototype/wall 0 0 0 1 1
 ( -672 -672 0 ) ( 672 -672 0 ) ( -672 -640 0 ) prototype/wall 0 0 0 1 1
 ( -672 -672 128 ) ( -672 -640 128 ) ( 672 -672 128 ) prototype/wall 0 0 0 1 1
+( -672 -640 0 ) ( 672 -640 0 ) ( -672 -640 128 ) prototype/wall 0 0 0 1 1
+( 672 -672 0 ) ( 672 -672 128 ) ( 672 -640 0 ) prototype/wall 0 0 0 1 1
+}
+// brush 9
+{
+( 64 -240 64 ) ( 64 -384 64 ) ( 64 -384 0 ) prototype/red 24 24 0 1 1
+( 64 -384 64 ) ( 80 -448 0 ) ( 64 -384 0 ) prototype/red 12.799988 1.6000061 0 1 1
+( 64 -384 64 ) ( 128 -384 64 ) ( 112 -448 0 ) prototype/ground 0 0 0 1 1
+( 128 -384 0 ) ( 128 -240 0 ) ( 64 -240 0 ) prototype/red 0 0 0 1 1
+( 64 -240 64 ) ( 128 -240 64 ) ( 128 -384 64 ) prototype/ground 0 0 0 1 1
+( 128 -240 0 ) ( 128 -240 64 ) ( 64 -240 64 ) prototype/red 0 0 0 1 1
+( 112 -448 0 ) ( 128 -384 64 ) ( 128 -384 0 ) prototype/red 14.400024 21.600006 0 1 1
+( 128 -384 64 ) ( 128 -240 64 ) ( 128 -240 0 ) prototype/red 24 24 0 1 1
 }
 }
+// entity 1
 {
 "classname" "env_world"
 "origin" "0 0 256"
 "sky_color" "135 206 235"
 "ambient_color" "217 217 230"
 }
+// entity 2
 {
 "classname" "env_sun"
 "origin" "0 0 0"
 "angles" "54.74 -135.0 0.0"
 }
+// entity 3
 {
 "classname" "player_spawn"
 "origin" "256 -63 21"
 "angle" "-180"
 }
+// entity 4
 {
 "classname" "player_spawn"
 "origin" "448 224 21"
 "angle" "-180"
 }
+// entity 5
 {
 "classname" "target"
 "origin" "-448 0 48"
 }
+// entity 6
 {
 "classname" "target"
 "origin" "-320 192 48"
 }
+// entity 7
 {
 "classname" "target"
 "origin" "-320 -192 48"
 }
+// entity 8
 {
 "classname" "weapon_spawner"
 "origin" "64 96 0"
 "weapons" "7"
 }
+// entity 9
 {
 "classname" "weapon_spawner"
 "origin" "-96 -256 0"
 "weapons" "6"
 }
+// entity 10
 {
 "classname" "weapon_spawner"
 "origin" "-384 320 0"

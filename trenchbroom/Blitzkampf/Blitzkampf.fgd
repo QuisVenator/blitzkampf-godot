@@ -1,0 +1,69 @@
+@BaseClass size(-8.0 -8.0 -8.0, 8.0 8.0 8.0) color(204 204 204) = Phong
+[
+	_phong(choices) : "Phong shading" : 0 = 
+	[
+		0 : "Disabled"
+		1 : "Smooth shading"
+	]
+	_phong_angle(float) : "Phong smoothing angle" : "89.0"
+]
+
+@BaseClass size(-8.0 -8.0 -8.0, 8.0 8.0 8.0) color(204 204 204) = VertexMergeDistance
+[
+	_vertex_merge_distance(float) : "Adjustable value to snap vertices to on map build. This can reduce instances of seams between polygons." : "0.03125"
+]
+
+@BaseClass size(-8.0 -8.0 -8.0, 8.0 8.0 8.0) color(204 204 204) = CullInteriorFaces
+[
+	_cull_interior_faces(choices) : "If true, cull interior faces with matching vertices or faces that are flush within a larger face. Note: This has a performance impact that scales with how many brushes are in the brush entity." : 0 = 
+	[
+		0 : "No"
+		1 : "Yes"
+	]
+]
+
+@SolidClass color(204 204 204) base(VertexMergeDistance, CullInteriorFaces) = worldspawn : "Default static world geometry. Builds a StaticBody3D with a single MeshInstance3D and a single convex CollisionShape3D shape." []
+
+@SolidClass color(204 204 204) base(Phong, VertexMergeDistance, CullInteriorFaces) = func_geo : "Static collidable geometry. Builds a StaticBody3D with a MeshInstance3D, a single concave CollisionShape3D, and an OccluderInstance3D." []
+
+@SolidClass color(204 204 204) base(Phong, VertexMergeDistance, CullInteriorFaces) = func_detail : "Static collidable geometry. Builds a StaticBody3D with a MeshInstance3D and a single concave CollisionShape3D. Does not occlude other VisualInstance3D nodes." []
+
+@SolidClass color(204 204 204) base(Phong, VertexMergeDistance, CullInteriorFaces) = func_detail_illusionary : "Static geometry with no collision. Builds a Node3D with a MeshInstance3D. Does not occlude other VisualInstance3D nodes." []
+
+@SolidClass color(204 204 204) base(Phong, VertexMergeDistance, CullInteriorFaces) = func_illusionary : "Static geometry with no collision. Builds a Node3D with a MeshInstance3D and an Occluder3D to aid in render culling of other VisualInstance3D nodes." []
+@PointClass color(51 230 77) size(-16.0 -16.0 0.0, 16.0 16.0 58.0) = player_spawn : "Where players appear. Place it on the floor; the arrow shows where they look." 
+[
+	angle(float) : "Facing (yaw, degrees)" : "0.0"
+]
+
+@PointClass color(255 153 26) size(-16.0 -16.0 0.0, 16.0 16.0 16.0) = weapon_spawner : "Offers one of the ticked weapons (none ticked = all) and offers another after it was taken." 
+[
+	respawn_delay(float) : "Seconds until a new weapon appears" : "8.0"
+	weapons(flags) = 
+	[
+		1 : "Pistol" : 1
+		2 : "SMG" : 1
+		4 : "Shotgun" : 1
+	]
+]
+
+@PointClass color(255 51 51) size(-16.0 -16.0 -16.0, 16.0 16.0 16.0) = target : "A practice target (a sphere that flashes when hit). The origin is its centre." []
+
+@PointClass color(255 230 77) size(-8.0 -8.0 -8.0, 8.0 8.0 8.0) = env_sun : "Directional light. Pitch Yaw Roll in 'angles': pitch 90 shines straight down." 
+[
+	angles(string) : "Pitch Yaw Roll" : "50.0 45.0 0.0"
+	color(color255) : "" : "255 255 255"
+	energy(float) : "Light energy" : "1.0"
+	shadows(choices) : "Cast shadows" : 0 = 
+	[
+		0 : "No"
+		1 : "Yes"
+	]
+]
+
+@PointClass color(102 179 255) size(-8.0 -8.0 -8.0, 8.0 8.0 8.0) = env_world : "Sky colour and ambient light. One per map." 
+[
+	ambient_color(color255) : "Flat ambient light colour" : "217 217 230"
+	ambient_energy(float) : "Ambient light energy" : "1.0"
+	sky_color(color255) : "Background colour" : "135 206 235"
+]
