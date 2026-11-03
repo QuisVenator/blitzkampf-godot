@@ -17,7 +17,7 @@ support_hand = NodePath("Rig/Hands/hand_L")
 [node name="Hands" parent="Rig" unique_id=558452219 instance=ExtResource("3_hands")]
 
 [node name="hand_L" parent="Rig/Hands" index="0" unique_id=1891315724]
-transform = Transform3D(-0.34123307, -0.13372779, -0.9304176, 0.3648768, -0.9310558, 0, -0.86627066, -0.3394878, 0.3665012, -0.079065055, -0.03, -0.5636937)
+transform = Transform3D(-0.34123307, -0.13372779, -0.9304176, 0.3648768, -0.9310558, 0, -0.86627066, -0.3394878, 0.3665012, -0.09550348, -0.04543083, -0.40215603)
 
 [node name="cuff_L" parent="Rig/Hands/hand_L" index="0" unique_id=872341828]
 transform = Transform3D(0.8660254, 0, -0.5, 0, 1, 0, 0.5, 0, 0.8660254, 0, 0, 0)
@@ -71,7 +71,7 @@ transform = Transform3D(1, 0, 0, 0, 0.9848077, 0.17364818, 0, -0.17364818, 0.984
 transform = Transform3D(1, 0, 0, 0, 0.9848077, 0.17364818, 0, -0.17364818, 0.9848077, 0, 0, -0.028)
 
 [node name="hand_R" parent="Rig/Hands" index="1" unique_id=1524430133]
-transform = Transform3D(0.05602258, 0.9961946, 0.06676516, -0.76604444, -3.3484863e-08, 0.6427875, 0.6403416, -0.0871557, 0.7631293, 0.042099908, -0.010585442, -0.017695926)
+transform = Transform3D(0.05602258, 0.9961946, 0.06676516, -0.76604444, -3.3484863e-08, 0.6427875, 0.6403416, -0.0871557, 0.7631293, 0.042099908, -0.010585442, 0.031530432)
 
 [node name="cuff_R" parent="Rig/Hands/hand_R" index="0" unique_id=1727954948]
 transform = Transform3D(0.9396926, 0, 0.34202012, 0, 1, 0, -0.34202012, 0, 0.9396926, 0, 0, 0)
@@ -119,7 +119,7 @@ transform = Transform3D(1, 0, 0, 0, 0.49999997, 0.86602545, 0, -0.86602545, 0.49
 transform = Transform3D(0.7880108, -0.1069085, 0.6063082, 0, 0.9848077, 0.17364818, -0.6156615, -0.13683663, 0.7760391, -0.036, 0, -0.02)
 
 [node name="thumb_02_R" parent="Rig/Hands/hand_R/thumb_01_R" index="2" unique_id=392598846]
-transform = Transform3D(1, 0, 0, 0, 0.9396926, 0.34202012, 0, -0.34202012, 0.9396926, 0, 0, -0.033999998)
+transform = Transform3D(1, 0, 0, 0, 0.96592575, -0.258819, 0, 0.258819, 0.96592575, 0, 0, -0.033999998)
 
 [node name="thumb_03_R" parent="Rig/Hands/hand_R/thumb_01_R/thumb_02_R" index="2" unique_id=1068995988]
 transform = Transform3D(1, 0, 0, 0, 0.9848077, 0.17364818, 0, -0.17364818, 0.9848077, 0, 0, -0.028)
