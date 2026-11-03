@@ -9,6 +9,8 @@ var in_mag := 0
 var reserve := 0
 var cooldown := 0.0
 var reload_left := 0.0
+## The pellet cone for the current stance (see `WeaponDefinition.pellet_spread_deg`).
+var pellet_spread_deg := 0.0
 var spread_deg := -1.0
 ## Shots fired since the weapon was equipped. The server counts them and sends the
 ## total with every ammo update; the owning client uses it to tell which of its

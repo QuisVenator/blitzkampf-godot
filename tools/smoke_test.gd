@@ -352,6 +352,15 @@ func _test_shotgun_and_smg() -> void:
 	var before := effects.get_child_count()
 	await _press(&"fire")
 	_check("a shotgun shot fires %d pellets (tracer + mark each)" % shotgun.pellets, effects.get_child_count() - before == shotgun.pellets * 2)
+	var hip_cone := _weapons.primary.pellet_spread_deg
+	var hip_crosshair := _weapons.current_spread_deg()
+	Input.action_press(&"aim")
+	await _frames(15)
+	_check("aiming tightens the shotgun's pellet cone (%.1f to %.1f deg)" % [hip_cone, _weapons.primary.pellet_spread_deg],
+			is_equal_approx(hip_cone, shotgun.pellet_spread_deg) and is_equal_approx(_weapons.primary.pellet_spread_deg, shotgun.ads_pellet_spread_deg) and shotgun.ads_pellet_spread_deg < hip_cone)
+	_check("and the crosshair shrinks with it", _weapons.current_spread_deg() < hip_crosshair)
+	Input.action_release(&"aim")
+	await _frames(15)
 
 	var smg: WeaponDefinition = load("res://resources/weapons/smg.tres")
 	_weapons.equip(WeaponManager.PRIMARY, smg)

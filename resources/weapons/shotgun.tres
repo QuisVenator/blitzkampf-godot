@@ -19,6 +19,7 @@ ads_sight_distance = 0.32
 damage = 12
 pellets = 8
 pellet_spread_deg = 3.0
+ads_pellet_spread_deg = 1.5
 magazine_size = 6
 reserve_ammo = 18
 reload_duration = 2.0

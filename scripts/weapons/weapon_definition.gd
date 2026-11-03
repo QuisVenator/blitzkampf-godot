@@ -41,6 +41,8 @@ extends Resource
 ## Extra cone half-angle (degrees) each pellet is scattered in around the aimed direction, on top of
 ## the aim spread below (0 for a single bullet). The crosshair shows both added.
 @export var pellet_spread_deg := 0.0
+## The pellet cone while aiming down sights; negative = the same as `pellet_spread_deg`.
+@export var ads_pellet_spread_deg := -1.0
 
 @export_group("Ammo")
 @export var magazine_size := 8

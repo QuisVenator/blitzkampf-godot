@@ -360,13 +360,16 @@ func _update_spread() -> void:
 	for slot in _slots:
 		if slot.is_empty():
 			continue
+		slot.pellet_spread_deg = slot.definition.pellet_spread_deg
 		if _aiming and slot == primary:
 			slot.spread_deg = slot.definition.ads_spread_deg
+			if slot.definition.ads_pellet_spread_deg >= 0.0:
+				slot.pellet_spread_deg = slot.definition.ads_pellet_spread_deg
 		elif _player.horizontal_speed() > MOVING_SPEED_THRESHOLD:
 			slot.spread_deg = slot.definition.hip_spread_moving_deg
 		else:
 			slot.spread_deg = slot.definition.hip_spread_standing_deg
-		widest = maxf(widest, slot.spread_deg + slot.definition.pellet_spread_deg)
+		widest = maxf(widest, slot.spread_deg + slot.pellet_spread_deg)
 	if not is_equal_approx(widest, _crosshair_spread_deg):
 		_crosshair_spread_deg = widest
 		spread_changed.emit(widest)
@@ -415,7 +418,7 @@ func _trace(slot: WeaponSlot, compensated: bool) -> Array[Dictionary]:
 	var pellet_basis := Basis.looking_at(aim, _camera.global_basis.y)
 	var shots: Array[Dictionary] = []
 	for i in definition.pellets:
-		var direction := _apply_spread(aim, pellet_basis, definition.pellet_spread_deg, rng)
+		var direction := _apply_spread(aim, pellet_basis, slot.pellet_spread_deg, rng)
 		var hit := _cast_ray(origin, direction, compensated)
 		if hit.is_empty():
 			shots.append({"muzzle": muzzle, "end": origin + direction * MAX_RANGE, "normal": Vector3.ZERO, "hit": hit})
