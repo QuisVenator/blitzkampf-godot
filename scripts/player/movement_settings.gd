@@ -85,7 +85,8 @@ extends Resource
 
 @export_group("Body")
 @export var standing_height := 1.8
-@export var crouch_height := 0.9
+## Matches the character model's crouch pose (its head reaches about 1.2 m), so the hitbox covers it.
+@export var crouch_height := 1.2
 @export var eye_height := 1.6
 @export var crouch_eye_height := 1.0
 @export var eye_ease_time := 0.12

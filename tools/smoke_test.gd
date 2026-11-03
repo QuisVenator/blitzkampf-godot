@@ -146,6 +146,7 @@ func _run() -> void:
 	await _test_ledge()
 	await _test_stairs()
 	await _test_wall_run()
+	await _test_low_ceiling()
 	_test_capsule_ray()
 	await _test_shotgun_and_smg()
 	await _test_akimbo()
@@ -249,6 +250,37 @@ func _test_stairs() -> void:
 	_check("walks down stairs staying on them", airborne == 0 and _player.global_position.y < 0.05)
 	body.queue_free()
 	_player.input.set_look(0.0, 0.0)
+	await _frames(5)
+
+
+## A ceiling at 1.5 m: a crouched body (1.2 m) fits under it, a standing one (1.8 m) doesn't, so letting go of
+## crouch under it keeps you crouched until you are out from under.
+func _test_low_ceiling() -> void:
+	Input.action_release(&"move_forward")
+	var body := StaticBody3D.new()
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(3.0, 0.5, 3.0)
+	shape.shape = box
+	body.add_child(shape)
+	body.position = Vector3(-14.0, 1.75, 17.0)  # underside at 1.5 m, z from 15.5 to 18.5
+	_main.add_child(body)
+	await _frames(2)
+	_player.teleport(Vector3(-14.0, 0.0, 19.3), 0.0)
+	await _frames(10)
+	Input.action_press(&"crouch")
+	await _frames(5)
+	_check("crouching is %.1f m high" % _player.get("_capsule").height, is_equal_approx(_player.get("_capsule").height, 1.2))
+	Input.action_press(&"move_forward")
+	await _frames(25)
+	_check("a crouched body fits under a 1.5 m ceiling", _player.global_position.z < 18.4 and _player.global_position.z > 16.0)
+	Input.action_release(&"crouch")
+	await _frames(10)
+	_check("it can't stand up under it", _player.stance == Player.Stance.CROUCHING)
+	await _frames(60)
+	Input.action_release(&"move_forward")
+	_check("and stands once it is out from under", _player.stance == Player.Stance.STANDING)
+	body.queue_free()
 	await _frames(5)
 
 
