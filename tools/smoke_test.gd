@@ -146,6 +146,7 @@ func _run() -> void:
 	await _test_ledge()
 	await _test_stairs()
 	await _test_wall_run()
+	_test_capsule_ray()
 	await _test_shotgun_and_smg()
 	await _test_akimbo()
 	await _test_pause()
@@ -340,6 +341,29 @@ func _test_console() -> void:
 
 
 ## Akimbo: pairing one-handed weapons, per-hand firing, F/G replacement, two-handed pickups.
+## Lag compensation judges shots against a capsule by maths (`CapsuleRay`): a ray at a standing body's eye
+## height must hit it (the top cap was once tested as the bottom one, so shots at the head and upper chest
+## missed), a ray beside it must not, and vertical rays meet the caps.
+func _test_capsule_ray() -> void:
+	var foot := Vector3(10, 0, -4)
+	var eye := Vector3(10, 1.6, 6)
+	_check("a ray at the chest hits a capsule", not CapsuleRay.intersect(Vector3(10, 1.2, 6), Vector3(0, 0, -1), foot, 1.8, 0.3).is_empty())
+	_check("a ray at eye height hits it (top cap)", not CapsuleRay.intersect(eye, Vector3(0, 0, -1), foot, 1.8, 0.3).is_empty())
+	_check("a ray just above the head misses", CapsuleRay.intersect(Vector3(10, 1.95, 6), Vector3(0, 0, -1), foot, 1.8, 0.3).is_empty())
+	_check("a ray beside it misses", CapsuleRay.intersect(Vector3(10.5, 1.2, 6), Vector3(0, 0, -1), foot, 1.8, 0.3).is_empty())
+	_check("a ray from above hits the top", not CapsuleRay.intersect(Vector3(10, 4, -4), Vector3.DOWN, foot, 1.8, 0.3).is_empty())
+	_check("a ray from below hits the bottom", not CapsuleRay.intersect(Vector3(10, -2, -4), Vector3.UP, foot, 1.8, 0.3).is_empty())
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5
+	var hits := 0
+	for i in 400:
+		var cone := sqrt(rng.randf()) * deg_to_rad(1.2)
+		var spin := rng.randf() * TAU
+		var direction := (Vector3(0, 0, -1) * cos(cone) + Vector3.RIGHT * sin(cone) * cos(spin) + Vector3.UP * sin(cone) * sin(spin)).normalized()
+		hits += 0 if CapsuleRay.intersect(eye, direction, foot, 1.8, 0.3).is_empty() else 1
+	_check("a hip-fire cone at 10 m hits a standing body nearly every time (%d%%)" % (hits / 4), hits >= 380)
+
+
 ## The shotgun fires all its pellets (a tracer and an impact mark each, against a wall); the SMG's
 ## recoil animation restarts with every shot (it once showed only every other one).
 func _test_shotgun_and_smg() -> void:
@@ -380,6 +404,22 @@ func _test_shotgun_and_smg() -> void:
 	_check("the SMG recoils on every shot (%d kicks, %d shots)" % [kicks, shots[0]], shots[0] >= 6 and absi(kicks - shots[0]) <= 1)
 	_weapons.equip(WeaponManager.PRIMARY, load("res://resources/weapons/pistol.tres"))
 	await _frames(40)
+
+	# A bullet hole on a player would hang in the air when it walks away: a tracer, but no mark.
+	var bot := (load("res://scenes/player/player.tscn") as PackedScene).instantiate() as Player
+	bot.get_node("PlayerInput").source = ScriptedInput.new()
+	bot.peer_id = 3
+	bot.is_local = false
+	_main.get_node("Players").add_child(bot)
+	bot.teleport(Vector3(0, 0, 3), 0.0)
+	_player.teleport(Vector3(0, 0, 8), 0.0)
+	await _frames(20)
+	var children_before := effects.get_child_count()
+	await _press(&"fire")
+	_check("a shot at a player hurts it", bot.health < 100)
+	_check("but leaves a tracer only, no bullet hole", effects.get_child_count() - children_before == 1)
+	bot.queue_free()
+	await _frames(5)
 
 
 func _test_akimbo() -> void:

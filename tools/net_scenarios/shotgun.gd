@@ -38,9 +38,12 @@ func run_client() -> void:
 		var effects := weapons.get_node("ShotEffects")
 		var before := effects.get_child_count()
 		scripted.frame.fire = true
-		await wait_seconds(0.15)
+		var most := 0
+		for i in 9:  # tracers last 0.1 s; count them while they are all alive
+			await get_tree().physics_frame
+			most = maxi(most, effects.get_child_count() - before)
 		scripted.frame.fire = false
-		check("the shooter sees all pellets' tracers at once", effects.get_child_count() - before >= weapons.primary.definition.pellets)
+		check("the shooter sees all pellets' tracers at once (%d)" % most, most >= weapons.primary.definition.pellets)
 		scripted.frame.fire = true
 		await wait_seconds(3.0)
 		scripted.frame.fire = false

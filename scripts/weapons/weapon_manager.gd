@@ -400,7 +400,7 @@ func _fire(slot: WeaponSlot) -> void:
 
 
 ## Where a shot from `slot` goes: one entry per pellet with its muzzle, end point, surface
-## normal (zero = no hit) and the raw ray hit. The spread rolls are seeded by the frame's
+## normal (zero = no hit, or no mark: not on players) and the raw ray hit. The spread rolls are seeded by the frame's
 ## sequence number and the hand, so the owning client's predicted shot takes exactly the
 ## paths the server's will (the aim roll first, then each pellet's). `compensated` is for
 ## the server (see `_cast_ray`).
@@ -423,7 +423,10 @@ func _trace(slot: WeaponSlot, compensated: bool) -> Array[Dictionary]:
 		if hit.is_empty():
 			shots.append({"muzzle": muzzle, "end": origin + direction * MAX_RANGE, "normal": Vector3.ZERO, "hit": hit})
 		else:
-			shots.append({"muzzle": muzzle, "end": hit["position"], "normal": hit["normal"], "hit": hit})
+			# A bullet hole stays where it is when its victim walks away, so only the world and
+			# targets get one (a zero normal means "no mark"); the hit itself still counts.
+			var normal: Vector3 = Vector3.ZERO if hit["collider"] is Player else hit["normal"]
+			shots.append({"muzzle": muzzle, "end": hit["position"], "normal": normal, "hit": hit})
 	return shots
 
 
