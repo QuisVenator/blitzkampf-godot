@@ -15,7 +15,7 @@ const MAX_CLIENTS := 8
 const REJECT_GRACE := 0.2
 
 ## A client is accepted only when this matches the server's (builds must agree).
-var protocol_version := 12
+var protocol_version := 13
 
 var role := Role.OFFLINE
 var address := "127.0.0.1"

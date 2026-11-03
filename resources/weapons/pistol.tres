@@ -8,7 +8,6 @@
 script = ExtResource("1_script")
 id = &"pistol"
 display_name = "Pistol"
-map_bit = 0
 model = ExtResource("2_model")
 viewmodel = ExtResource("3_viewmodel")
 one_handed = true

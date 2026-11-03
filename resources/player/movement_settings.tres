@@ -1,6 +1,9 @@
-[gd_resource type="Resource" script_class="MovementSettings" format=3]
+[gd_resource type="Resource" script_class="MovementSettings" format=3 uid="uid://b027na8cpqhsw"]
 
-[ext_resource type="Script" path="res://scripts/player/movement_settings.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://bv6set8wvs8jw" path="res://scripts/player/movement_settings.gd" id="1_script"]
 
 [resource]
 script = ExtResource("1_script")
+slide_entry_speed = 13.0
+slide_friction = 2.0
+slide_sustain_duration = 0.2

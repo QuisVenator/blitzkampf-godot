@@ -90,6 +90,17 @@ extends Resource
 @export var crouch_eye_height := 1.0
 @export var eye_ease_time := 0.12
 
+@export_group("Speed FOV")
+## Extra vertical field of view (degrees) at `speed_fov_full_speed`, none at `speed_fov_threshold`
+## (in between it scales): the view widens while you are faster than a sprint (a slide's boost),
+## and relaxes back as the speed falls. Not while aiming down sights.
+@export var speed_fov_boost := 10.0
+@export var speed_fov_threshold := 10.0
+@export var speed_fov_full_speed := 12.0
+## How quickly the view widens and relaxes (rates, 1/s; higher = faster).
+@export var speed_fov_attack := 14.0
+@export var speed_fov_release := 3.5
+
 @export_group("Look and feedback")
 @export var mouse_sensitivity := 0.0022
 @export var footstep_distance := 2.2

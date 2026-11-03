@@ -48,6 +48,7 @@ func _run() -> void:
 	await _frames(3)
 	_check("slide started", _player.stance == Player.Stance.SLIDING)
 	_check("slide speed >= 10.9", _player.horizontal_speed() >= 10.9)
+	_check("the view widens in a fast slide (fov %.1f)" % _player.camera.fov, _player.camera.fov > 80.0)
 	await _frames(20)
 	var mid_slide := _player.horizontal_speed()
 	await _frames(20)
@@ -59,6 +60,8 @@ func _run() -> void:
 	_check("stands after releasing crouch", _player.stance == Player.Stance.STANDING)
 	await _frames(10)
 	_check_near("instant stop on no input", _player.horizontal_speed(), 0.0, 0.01)
+	await _frames(100)
+	_check("the view relaxes back when slow (fov %.1f)" % _player.camera.fov, _player.camera.fov < 75.5)
 
 	# Jump.
 	Input.action_press(&"jump")
@@ -131,6 +134,7 @@ func _run() -> void:
 	await _test_ledge()
 	await _test_stairs()
 	await _test_wall_run()
+	await _test_shotgun_and_smg()
 	await _test_akimbo()
 	await _test_pause()
 	await _test_bot()
@@ -320,6 +324,39 @@ func _test_console() -> void:
 
 
 ## Akimbo: pairing one-handed weapons, per-hand firing, F/G replacement, two-handed pickups.
+## The shotgun fires all its pellets (a tracer and an impact mark each, against a wall); the SMG's
+## recoil animation restarts with every shot (it once showed only every other one).
+func _test_shotgun_and_smg() -> void:
+	_player.teleport(Vector3(0, 0, 8), 0.0)
+	await _frames(10)
+	var shotgun: WeaponDefinition = load("res://resources/weapons/shotgun.tres")
+	_weapons.equip(WeaponManager.PRIMARY, shotgun)
+	await _frames(40)
+	var effects := _weapons.get_node("ShotEffects")
+	var before := effects.get_child_count()
+	await _press(&"fire")
+	_check("a shotgun shot fires %d pellets (tracer + mark each)" % shotgun.pellets, effects.get_child_count() - before == shotgun.pellets * 2)
+
+	var smg: WeaponDefinition = load("res://resources/weapons/smg.tres")
+	_weapons.equip(WeaponManager.PRIMARY, smg)
+	await _frames(60)
+	var rig := _weapons.primary.viewmodel.get_node("Rig") as Node3D
+	var shots: Array[int] = [0]
+	_weapons.fired.connect(func(_definition: WeaponDefinition) -> void: shots[0] += 1)
+	var kicks := 0
+	var was_kicking := false
+	Input.action_press(&"fire")
+	for i in 42:
+		await _frames(1)
+		var kicking := rig.position.z > 0.03
+		kicks += 1 if kicking and not was_kicking else 0
+		was_kicking = kicking
+	Input.action_release(&"fire")
+	_check("the SMG recoils on every shot (%d kicks, %d shots)" % [kicks, shots[0]], shots[0] >= 6 and absi(kicks - shots[0]) <= 1)
+	_weapons.equip(WeaponManager.PRIMARY, load("res://resources/weapons/pistol.tres"))
+	await _frames(40)
+
+
 func _test_akimbo() -> void:
 	var pistol: WeaponDefinition = load("res://resources/weapons/pistol.tres")
 	var smg: WeaponDefinition = load("res://resources/weapons/smg.tres")

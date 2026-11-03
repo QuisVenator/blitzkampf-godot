@@ -13,6 +13,7 @@ const SCENARIOS := [
 	["map_sync", 1, [], ["--server", "--map=test_arena_map"]],
 	["two_clients", 2, [], ["--server"]],
 	["shoot", 2, [], ["--server"]],
+	["shotgun", 2, [], ["--server"]],
 	["weapons", 1, [], ["--server"]],
 	["prediction", 1, ["--net-lag=80", "--net-loss=3"], ["--server"]],
 	["wallrun", 1, ["--net-lag=80", "--net-loss=3"], ["--server"]],

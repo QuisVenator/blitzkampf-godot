@@ -23,6 +23,13 @@ func play(animation: StringName, duration := 0.0) -> void:
 	var length := _animations.get_animation(animation).length
 	_animations.speed_scale = length / duration if duration > 0.0 else 1.0
 	_animations.play(animation)
+	# `play` leaves an animation that is still (just) playing alone, which dropped every other kick of a fast weapon.
+	_animations.seek(0.0, true)
+
+
+## Seconds `animation` lasts at normal speed (0 if there is none).
+func animation_length(animation: StringName) -> float:
+	return _animations.get_animation(animation).length if has_animation(animation) else 0.0
 
 
 func has_animation(animation: StringName) -> bool:

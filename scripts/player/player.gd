@@ -151,6 +151,8 @@ var _wall_run := false
 var _wall_normal := Vector2.ZERO  # horizontal, pointing from the wall toward the body
 var _wall_time := 0.0
 var _wall_cooldown := 0.0
+## Extra camera FOV (degrees) from speed (see `MovementSettings.speed_fov_boost`); the weapon manager adds it to the camera's FOV.
+var speed_fov_boost := 0.0
 var _view_roll := 0.0  # camera roll (radians) while wall running, local view only
 var _distance_since_step := 0.0
 var _eye_height := 0.0
@@ -273,6 +275,7 @@ func _process(delta: float) -> void:
 		_error_offset = _error_offset.lerp(Vector3.ZERO, 1.0 - exp(-ERROR_SMOOTH_RATE * delta))
 		_settle_step_offset(delta)
 		_settle_view_roll(delta)
+		_settle_speed_fov(delta)
 	elif not is_multiplayer_authority():
 		_interpolate_remote()
 	if is_local or is_multiplayer_authority():
@@ -557,6 +560,14 @@ func _hide_step(rise: float) -> void:
 func _commit_step_pending() -> void:
 	_step_offset += _step_pending
 	_step_pending = 0.0
+
+
+## Widens the field of view while moving faster than `speed_fov_threshold`, quickly on the way up and slowly back.
+func _settle_speed_fov(delta: float) -> void:
+	var amount := clampf(inverse_lerp(settings.speed_fov_threshold, settings.speed_fov_full_speed, horizontal_speed()), 0.0, 1.0)
+	var target := settings.speed_fov_boost * amount if alive else 0.0
+	var rate := settings.speed_fov_attack if target > speed_fov_boost else settings.speed_fov_release
+	speed_fov_boost = lerpf(speed_fov_boost, target, 1.0 - exp(-rate * delta))
 
 
 ## Leans the view away from the wall during a wall run and back afterwards.

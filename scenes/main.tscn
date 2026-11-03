@@ -7,31 +7,29 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/scoreboard.tscn" id="7_scoreboard"]
 [ext_resource type="PackedScene" path="res://scenes/ui/debug_console.tscn" id="8_console"]
 
-[node name="Main" type="Node3D"]
+[node name="Main" type="Node3D" unique_id=1080613888]
 script = ExtResource("1_main")
 
-[node name="Map" type="Node3D" parent="."]
+[node name="Map" type="Node3D" parent="." unique_id=1220989485]
 
-[node name="Players" type="Node3D" parent="."]
+[node name="Players" type="Node3D" parent="." unique_id=1802755387]
 
-[node name="PlayerSpawner" type="MultiplayerSpawner" parent="."]
-_spawnable_scenes = PackedStringArray()
+[node name="PlayerSpawner" type="MultiplayerSpawner" parent="." unique_id=224246778]
 spawn_path = NodePath("../Players")
 
-[node name="DropSpawner" type="MultiplayerSpawner" parent="." groups=["drop_spawner"]]
-_spawnable_scenes = PackedStringArray()
+[node name="DropSpawner" type="MultiplayerSpawner" parent="." unique_id=1180120238 groups=["drop_spawner"]]
 spawn_path = NodePath("../Drops")
 
-[node name="Drops" type="Node3D" parent="." groups=["drops"]]
+[node name="Drops" type="Node3D" parent="." unique_id=347345980 groups=["drops"]]
 
-[node name="Scoreboard" parent="." instance=ExtResource("7_scoreboard")]
+[node name="Scoreboard" parent="." unique_id=371177667 instance=ExtResource("7_scoreboard")]
 players_path = NodePath("../Players")
 
-[node name="DebugConsole" parent="." instance=ExtResource("8_console")]
+[node name="DebugConsole" parent="." unique_id=1329546999 instance=ExtResource("8_console")]
 
-[node name="Hud" parent="." instance=ExtResource("4_hud")]
+[node name="Hud" parent="." unique_id=893929293 instance=ExtResource("4_hud")]
 
-[node name="PauseMenu" parent="." instance=ExtResource("6_pause")]
+[node name="PauseMenu" parent="." unique_id=101851807 instance=ExtResource("6_pause")]
 
-[node name="Sfx" type="Node" parent="."]
+[node name="Sfx" type="Node" parent="." unique_id=619806129]
 script = ExtResource("5_sfx")

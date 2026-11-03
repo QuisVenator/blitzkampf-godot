@@ -34,8 +34,13 @@ extends Resource
 @export var ads_sight_distance := 0.42
 
 @export_group("Damage")
-## Health removed per hit (one ray per shot).
+## Health removed per hit; a shot fires `pellets` rays, each doing this much (a shotgun's pellets add up).
 @export var damage := 25
+## Rays per shot.
+@export var pellets := 1
+## Extra cone half-angle (degrees) each pellet is scattered in around the aimed direction, on top of
+## the aim spread below (0 for a single bullet). The crosshair shows both added.
+@export var pellet_spread_deg := 0.0
 
 @export_group("Ammo")
 @export var magazine_size := 8

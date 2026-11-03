@@ -85,6 +85,7 @@ var _mirror_ready := false
 var _aiming := false
 var _pose_tween: Tween
 var _hip_fov := 75.0
+var _view_fov := 75.0  # the aim tween's FOV; the camera shows it plus the player's speed boost
 
 @onready var _player: Player = get_parent()
 @onready var _camera: Camera3D = $"../Head/Camera3D"
@@ -93,6 +94,7 @@ var _hip_fov := 75.0
 
 func _ready() -> void:
 	_hip_fov = _camera.fov
+	_view_fov = _hip_fov
 	if _player.is_local:
 		# Weapons are drawn by a camera of their own (see `ViewmodelView`).
 		var view := VIEWMODEL_VIEW.instantiate() as ViewmodelView
@@ -114,6 +116,17 @@ func _ready() -> void:
 		_connect_owner_updates()
 	elif _player.is_local:
 		_rpc_request_state.rpc_id(1)
+
+
+## The camera shows the aim tween's FOV plus the player's speed boost.
+func _process(_delta: float) -> void:
+	if not _player.is_local:
+		return
+	# The boost fades out as the sights come up.
+	var hip_share := 1.0
+	if primary and primary.definition:
+		hip_share = clampf(inverse_lerp(primary.definition.ads_fov, _hip_fov, _view_fov), 0.0, 1.0)
+	_camera.fov = _view_fov + _player.speed_fov_boost * hip_share
 
 
 ## True while any weapon is reloading or waiting to; firing is blocked meanwhile.
@@ -264,8 +277,10 @@ func _predict_feedback(delta: float) -> void:
 			slot.pending_shots.append(Time.get_ticks_msec())
 			slot.in_mag -= 1
 			ammo_changed.emit(slot_index, slot.in_mag, slot.reserve)
-			var shot := _trace(slot, false)
-			_show_shot(slot.definition.id, shot["muzzle"], shot["end"], shot["normal"])
+			var shots := _trace(slot, false)
+			for index in shots.size():
+				var shot: Dictionary = shots[index]
+				_show_shot(slot.definition.id, shot["muzzle"], shot["end"], shot["normal"], index == 0)
 			_kick_recoil(slot)
 			fired.emit(slot.definition)
 
@@ -336,7 +351,7 @@ func _move_to_pose(aiming: bool) -> void:
 	_pose_tween = create_tween().set_parallel().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	_pose_tween.tween_property(primary.holder, "position", target_position, definition.ads_time)
 	_pose_tween.tween_property(primary.holder, "rotation:y", target_yaw, definition.ads_time)
-	_pose_tween.tween_property(_camera, "fov", target_fov, definition.ads_time)
+	_pose_tween.tween_property(self, "_view_fov", target_fov, definition.ads_time)
 
 
 func _update_spread() -> void:
@@ -350,47 +365,62 @@ func _update_spread() -> void:
 			slot.spread_deg = slot.definition.hip_spread_moving_deg
 		else:
 			slot.spread_deg = slot.definition.hip_spread_standing_deg
-		widest = maxf(widest, slot.spread_deg)
+		widest = maxf(widest, slot.spread_deg + slot.definition.pellet_spread_deg)
 	if not is_equal_approx(widest, _crosshair_spread_deg):
 		_crosshair_spread_deg = widest
 		spread_changed.emit(widest)
 
 
 func _fire(slot: WeaponSlot) -> void:
-	var shot := _trace(slot, true)
+	var shots := _trace(slot, true)
 	var id := slot.definition.id
-	_show_shot(id, shot["muzzle"], shot["end"], shot["normal"])
-	_rpc_shot.rpc(id, shot["muzzle"], shot["end"], shot["normal"])
-	var hit: Dictionary = shot["hit"]
-	if not hit.is_empty():
-		var collider: Object = hit["collider"]
-		if collider.has_method(&"take_damage"):
-			collider.take_damage(slot.definition.damage, _player)
-			hit_confirmed.emit()
+	# A shot's pellets hitting the same target add up to one hit (one `take_damage`, one hit marker).
+	var damage_dealt := {}
+	for index in shots.size():
+		var shot: Dictionary = shots[index]
+		_show_shot(id, shot["muzzle"], shot["end"], shot["normal"], index == 0)
+		_rpc_shot.rpc(id, shot["muzzle"], shot["end"], shot["normal"], index == 0)
+		var hit: Dictionary = shot["hit"]
+		if not hit.is_empty():
+			var collider: Object = hit["collider"]
+			if collider.has_method(&"take_damage"):
+				damage_dealt[collider] = damage_dealt.get(collider, 0) + slot.definition.damage
+	for collider: Object in damage_dealt:
+		collider.take_damage(damage_dealt[collider], _player)
+	if not damage_dealt.is_empty():
+		hit_confirmed.emit()
 
 	_last_fired_slot = _slots.find(slot)
 	_kick_recoil(slot)
 	fired.emit(slot.definition)
 
 
-## Where a shot from `slot` goes: its muzzle, end point, surface normal (zero = no
-## hit) and the raw ray hit. The spread roll is seeded by the frame's sequence number
-## and the hand, so the owning client's predicted shot takes exactly the path the
-## server's will. `compensated` is for the server (see `_cast_ray`).
-func _trace(slot: WeaponSlot, compensated: bool) -> Dictionary:
+## Where a shot from `slot` goes: one entry per pellet with its muzzle, end point, surface
+## normal (zero = no hit) and the raw ray hit. The spread rolls are seeded by the frame's
+## sequence number and the hand, so the owning client's predicted shot takes exactly the
+## paths the server's will (the aim roll first, then each pellet's). `compensated` is for
+## the server (see `_cast_ray`).
+func _trace(slot: WeaponSlot, compensated: bool) -> Array[Dictionary]:
 	var origin := _camera.global_position
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(_frame.sequence * 2 + _slots.find(slot))  # hashed: nearby seeds give similar first rolls
-	var direction := _apply_spread(-_camera.global_basis.z, _camera.global_basis, slot.spread_deg, rng)
-	var hit := _cast_ray(origin, direction, compensated)
-
-	var muzzle := origin + direction * MUZZLE_FALLBACK_DISTANCE
+	var aim := _apply_spread(-_camera.global_basis.z, _camera.global_basis, slot.spread_deg, rng)
+	var muzzle := origin + aim * MUZZLE_FALLBACK_DISTANCE
 	var muzzle_marker := slot.muzzle_marker()
 	if muzzle_marker:
 		muzzle = muzzle_marker.global_position
-	if hit.is_empty():
-		return {"muzzle": muzzle, "end": origin + direction * MAX_RANGE, "normal": Vector3.ZERO, "hit": hit}
-	return {"muzzle": muzzle, "end": hit["position"], "normal": hit["normal"], "hit": hit}
+
+	var definition := slot.definition
+	var pellet_basis := Basis.looking_at(aim, _camera.global_basis.y)
+	var shots: Array[Dictionary] = []
+	for i in definition.pellets:
+		var direction := _apply_spread(aim, pellet_basis, definition.pellet_spread_deg, rng)
+		var hit := _cast_ray(origin, direction, compensated)
+		if hit.is_empty():
+			shots.append({"muzzle": muzzle, "end": origin + direction * MAX_RANGE, "normal": Vector3.ZERO, "hit": hit})
+		else:
+			shots.append({"muzzle": muzzle, "end": hit["position"], "normal": hit["normal"], "hit": hit})
+	return shots
 
 
 ## The first thing a bullet hits, shaped like `intersect_ray`'s result. For a shooter
@@ -460,7 +490,8 @@ func _kick_recoil(slot: WeaponSlot) -> void:
 	var scene := slot.viewmodel as WeaponViewmodel
 	var ads_animation: StringName = &"fire_ads" if _aiming and slot == primary else &"fire"
 	if scene and scene.has_animation(ads_animation):
-		scene.play(ads_animation)
+		# The kick must be over by the next shot, or a fast weapon restarts it halfway through every time.
+		scene.play(ads_animation, minf(scene.animation_length(ads_animation), slot.definition.fire_cooldown))
 		return
 	if slot.recoil_tween:
 		slot.recoil_tween.kill()
@@ -668,22 +699,23 @@ func _connect_owner_updates() -> void:
 			_rpc_event.rpc_id(peer, EVENT_PICKED_UP))
 
 
-func _show_shot(id: StringName, from: Vector3, to: Vector3, normal: Vector3) -> void:
+## `with_sound`: only the first pellet of a shot makes the (positional) shot sound.
+func _show_shot(id: StringName, from: Vector3, to: Vector3, normal: Vector3, with_sound: bool) -> void:
 	_effects.spawn_tracer(from, to)
 	if normal != Vector3.ZERO:
 		_effects.spawn_impact(to, normal)
-	if not _player.is_local:
+	if with_sound and not _player.is_local:
 		var definition := WeaponCatalog.get_default().find(id)
 		heard.emit(&"fire", from, definition.fire_pitch_scale if definition else 1.0)
 
 
 ## Everyone but the server: a bullet's tracer and impact (zero normal = no hit),
-## and the shot's sound for players other than the shooter.
+## and the shot's sound for players other than the shooter (a shotgun sends one per pellet).
 @rpc("authority", "call_remote", "unreliable")
-func _rpc_shot(id: StringName, from: Vector3, to: Vector3, normal: Vector3) -> void:
+func _rpc_shot(id: StringName, from: Vector3, to: Vector3, normal: Vector3, with_sound: bool) -> void:
 	if _player.is_local:
 		return  # the owner already saw its own predicted tracer
-	_show_shot(id, from, to, normal)
+	_show_shot(id, from, to, normal, with_sound)
 
 
 ## Server: other players hear this too (reloads, pickups).

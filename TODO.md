@@ -24,6 +24,7 @@ Rough order of intent, not a commitment. Tick items off (and move them to Done) 
 - [x] TrenchBroom maps via FuncGodot: runtime build, map selector, player/weapon spawner/target/sun/environment entities, starter `maps/test_arena.map`
 - [ ] Try editing `maps/test_large.map` in TrenchBroom end to end (move brushes, retexture, spawner checkboxes) and fix whatever hurts
 - [ ] More TrenchBroom entities (props, doors, triggers, jump pads, bot navigation hints) and a real second map
+- [ ] The slide loses speed quickly (12 to 3.5 m/s in about 0.5 s with `slide_friction` 2.5): decide whether it should carry further
 - [ ] Real audio, more maps
 
 ## Ideas / open questions
