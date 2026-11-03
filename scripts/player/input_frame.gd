@@ -32,6 +32,7 @@ var fire_secondary := false
 var aim := false
 
 # Edge events: true only for the tick in which the button went down.
+var jump_pressed := false
 var crouch_pressed := false
 var reload_pressed := false
 var interact_pressed := false
@@ -39,6 +40,7 @@ var interact_alt_pressed := false
 
 
 func clear_edges() -> void:
+	jump_pressed = false
 	crouch_pressed = false
 	reload_pressed = false
 	interact_pressed = false

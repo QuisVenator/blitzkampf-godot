@@ -10,12 +10,12 @@ extends InputSource
 enum Field {
 	SEQUENCE, MOVE_X, MOVE_Y, YAW, PITCH,
 	HELD,  # bit set of the HELD_* flags below
-	CROUCH_COUNT, RELOAD_COUNT, INTERACT_COUNT, INTERACT_ALT_COUNT,
+	CROUCH_COUNT, RELOAD_COUNT, INTERACT_COUNT, INTERACT_ALT_COUNT, JUMP_COUNT,
 	VIEW_TICK,
 	SIZE,
 }
 ## Indices into the running press counters (`pack`'s `counts`), in `Field` order.
-enum Count { CROUCH, RELOAD, INTERACT, INTERACT_ALT }
+enum Count { CROUCH, RELOAD, INTERACT, INTERACT_ALT, JUMP }
 const PACKET_SIZE := Field.SIZE
 ## Without news from the client for this long its player stops acting.
 const STALE_MS := 500
@@ -51,7 +51,7 @@ static func pack(frame: InputFrame, counts: Array[int]) -> PackedFloat32Array:
 	held |= HELD_AIM if frame.aim else 0
 	return PackedFloat32Array([
 		frame.sequence, frame.move.x, frame.move.y, frame.yaw, frame.pitch, held,
-		counts[Count.CROUCH], counts[Count.RELOAD], counts[Count.INTERACT], counts[Count.INTERACT_ALT],
+		counts[Count.CROUCH], counts[Count.RELOAD], counts[Count.INTERACT], counts[Count.INTERACT_ALT], counts[Count.JUMP],
 		frame.view_tick,
 	])
 
@@ -101,7 +101,7 @@ func _next_frame() -> InputFrame:
 	var frame := _unpack(packet)
 	var counts: Array[int] = [
 		int(packet[Field.CROUCH_COUNT]), int(packet[Field.RELOAD_COUNT]),
-		int(packet[Field.INTERACT_COUNT]), int(packet[Field.INTERACT_ALT_COUNT]),
+		int(packet[Field.INTERACT_COUNT]), int(packet[Field.INTERACT_ALT_COUNT]), int(packet[Field.JUMP_COUNT]),
 	]
 	if _seen.is_empty():
 		_seen = counts.duplicate()
@@ -110,6 +110,7 @@ func _next_frame() -> InputFrame:
 	frame.reload_pressed = counts[Count.RELOAD] > _seen[Count.RELOAD]
 	frame.interact_pressed = counts[Count.INTERACT] > _seen[Count.INTERACT]
 	frame.interact_alt_pressed = counts[Count.INTERACT_ALT] > _seen[Count.INTERACT_ALT]
+	frame.jump_pressed = counts[Count.JUMP] > _seen[Count.JUMP]
 	_seen = counts
 	_last = frame
 	_last_sequence = frame.sequence

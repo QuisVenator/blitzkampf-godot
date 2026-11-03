@@ -2,7 +2,7 @@
 
 A fast arena shooter in Godot 4.7 (GL Compatibility, Jolt physics). Work in progress.
 
-- Quake-style movement with sprint, slide and ledge climbing
+- Quake-style movement with sprint, slide, stairs, ledge climbing and wall running
 - Pistol, SMG and shotgun (akimbo for the one-handed ones), first-person hands, pickups and drops
 - Server-authoritative multiplayer with client prediction and lag compensation (single player, host, dedicated server, join)
 - Levels built in [TrenchBroom](https://trenchbroom.github.io/) through [FuncGodot](https://github.com/func-godot/func_godot_plugin), with a map selector in the menu

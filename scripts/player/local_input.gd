@@ -24,6 +24,7 @@ func sample(input: PlayerInput) -> InputFrame:
 	frame.fire = GameInput.held(&"fire")
 	frame.fire_secondary = GameInput.held(&"fire_secondary")
 	frame.aim = GameInput.held(&"aim")
+	frame.jump_pressed = GameInput.just_pressed(&"jump")
 	frame.crouch_pressed = GameInput.just_pressed(&"crouch")
 	frame.reload_pressed = GameInput.just_pressed(&"reload")
 	frame.interact_pressed = GameInput.just_pressed(&"interact")

@@ -32,6 +32,7 @@ enum Snap {
 	VEL_X, VEL_Y, VEL_Z,
 	YAW, PITCH, STANCE, SLIDE, ON_FLOOR,
 	MANTLE, TARGET_X, TARGET_Y, TARGET_Z, MANTLE_SPEED,  # ledge climb: phase, where it ends, approach speed
+	WALL_RUN, WALL_NX, WALL_NZ, WALL_TIME, WALL_COOLDOWN,  # wall run: running, wall normal (x, z), time on it, cooldown
 	TICK,  # the server's physics tick
 	SIZE,
 }
@@ -146,6 +147,11 @@ var _grounded := false  # on the floor, or just above one (stairs): see `_floor_
 var _mantle := Mantle.NONE
 var _mantle_target := Vector3.ZERO
 var _mantle_speed := 0.0  # horizontal speed on approach
+var _wall_run := false
+var _wall_normal := Vector2.ZERO  # horizontal, pointing from the wall toward the body
+var _wall_time := 0.0
+var _wall_cooldown := 0.0
+var _view_roll := 0.0  # camera roll (radians) while wall running, local view only
 var _distance_since_step := 0.0
 var _eye_height := 0.0
 var _eye_tween: Tween
@@ -243,6 +249,8 @@ func teleport(to: Vector3, new_yaw: float) -> void:
 	_pose_history.clear()
 	velocity = Vector3.ZERO
 	_mantle = Mantle.NONE
+	_wall_run = false
+	_wall_cooldown = 0.0
 	_step_offset = 0.0
 	_step_velocity = 0.0
 	_step_pending = 0.0
@@ -264,6 +272,7 @@ func _process(delta: float) -> void:
 		pitch = input.look_pitch
 		_error_offset = _error_offset.lerp(Vector3.ZERO, 1.0 - exp(-ERROR_SMOOTH_RATE * delta))
 		_settle_step_offset(delta)
+		_settle_view_roll(delta)
 	elif not is_multiplayer_authority():
 		_interpolate_remote()
 	if is_local or is_multiplayer_authority():
@@ -276,7 +285,7 @@ func _process(delta: float) -> void:
 
 func _update_camera() -> void:
 	var eye_position := get_global_transform_interpolated().origin + Vector3.UP * (_eye_height + _step_offset + _step_pending * Engine.get_physics_interpolation_fraction()) + _error_offset
-	head.global_transform = Transform3D(Basis.from_euler(Vector3(pitch, yaw, 0.0), EULER_ORDER_YXZ), eye_position)
+	head.global_transform = Transform3D(Basis.from_euler(Vector3(pitch, yaw, _view_roll), EULER_ORDER_YXZ), eye_position)
 
 
 func _physics_process(delta: float) -> void:
@@ -325,7 +334,9 @@ func _simulate(delta: float) -> void:
 	var grounded := is_on_floor() or (_grounded and _floor_just_below())
 	_grounded = grounded
 
+	_wall_cooldown = maxf(_wall_cooldown - delta, 0.0)
 	if not alive:
+		_wall_run = false
 		# Dead: no control, but still fall and settle.
 		velocity.x = 0.0
 		velocity.z = 0.0
@@ -336,6 +347,9 @@ func _simulate(delta: float) -> void:
 
 	if _mantle != Mantle.NONE:
 		_simulate_mantle(delta)
+		return
+	if _wall_run:
+		_simulate_wall_run(delta, has_wish, wish_dir)
 		return
 
 	_update_stance(has_wish, wish_dir, grounded, delta)
@@ -375,6 +389,16 @@ func _simulate(delta: float) -> void:
 			_simulate_mantle(delta)
 			return
 
+	if not grounded and has_wish and stance != Stance.SLIDING and _wall_cooldown <= 0.0:
+		var wall := _find_wall()
+		if wall != Vector3.ZERO:
+			_wall_run = true
+			_wall_normal = Vector2(wall.x, wall.z)
+			_wall_time = 0.0
+			velocity.y = settings.wallrun_entry_vertical_speed
+			_simulate_wall_run(delta, has_wish, wish_dir)
+			return
+
 	var height_before := global_position.y
 	var stepped := false
 	if grounded:
@@ -387,6 +411,103 @@ func _simulate(delta: float) -> void:
 		_hide_step(global_position.y - height_before)
 	if not _replaying:
 		_track_footsteps(has_wish, delta)
+
+
+## A wall beside a fast, airborne body that it could run on: returns its horizontal normal (pointing
+## at the body), or `Vector3.ZERO`. Needs speed (`wallrun_min_speed`), height above the floor, and a
+## near-vertical wall within `wallrun_reach` at knee and chest height on the left or right, roughly
+## along the direction of travel (a head-on wall is not a run, it is a wall or a ledge).
+func _find_wall() -> Vector3:
+	var flat := Vector3(velocity.x, 0.0, velocity.z)
+	if flat.length() < settings.wallrun_min_speed:
+		return Vector3.ZERO
+	var forward := flat.normalized()
+	var space := get_world_3d().direct_space_state
+	var below := PhysicsRayQueryParameters3D.create(
+		global_position + Vector3.UP * 0.1, global_position + Vector3.DOWN * settings.wallrun_min_height, LEDGE_MASK)
+	if not space.intersect_ray(below).is_empty():
+		return Vector3.ZERO
+	var best := Vector3.ZERO
+	var best_distance := INF
+	for side in [-1.0, 1.0]:
+		var sideways: Vector3 = forward.cross(Vector3.UP) * side
+		var normal := _wall_normal_toward(space, sideways)
+		if normal == Vector3.ZERO or absf(normal.dot(forward)) > 0.6:
+			continue
+		var distance := _wall_distance(space, sideways)
+		if distance < best_distance:
+			best_distance = distance
+			best = normal
+	return best
+
+
+## Normal of the wall in direction `toward` (horizontal, unit) if both the knee and the chest ray hit a
+## near-vertical surface within reach, else `Vector3.ZERO`.
+func _wall_normal_toward(space: PhysicsDirectSpaceState3D, toward: Vector3) -> Vector3:
+	var total := Vector3.ZERO
+	for height: float in [0.5, 1.3]:
+		var from := global_position + Vector3.UP * height
+		var query := PhysicsRayQueryParameters3D.create(from, from + toward * (_capsule.radius + settings.wallrun_reach), LEDGE_MASK)
+		var hit := space.intersect_ray(query)
+		if hit.is_empty() or absf(hit.normal.y) > 0.25:
+			return Vector3.ZERO
+		total += hit.normal
+	var flat := Vector3(total.x, 0.0, total.z)
+	return flat.normalized() if flat.length() > 0.001 else Vector3.ZERO
+
+
+func _wall_distance(space: PhysicsDirectSpaceState3D, toward: Vector3) -> float:
+	var from := global_position + Vector3.UP * 0.9
+	var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(from, from + toward * (_capsule.radius + settings.wallrun_reach), LEDGE_MASK))
+	return from.distance_to(hit.position) if not hit.is_empty() else INF
+
+
+## One tick of a wall run: gravity mostly off (growing over the run), speed along the wall
+## accelerating to `wallrun_speed`, a little pressure into the wall. Ends when the wall ends, the
+## run is too slow or too long, forward input stops, crouch is pressed, the body lands, or in a
+## wall jump (jump pressed): off the wall with `wallrun_jump_push`, up with `wallrun_jump_up`,
+## keeping the speed along the wall.
+func _simulate_wall_run(delta: float, has_wish: bool, wish_dir: Vector2) -> void:
+	var normal := Vector3(_wall_normal.x, 0.0, _wall_normal.y)
+	_wall_time += delta
+	var along := Vector3(velocity.x, 0.0, velocity.z)
+	along -= normal * along.dot(normal)
+	var speed := along.length()
+	var heading := Vector2(along.x, along.z).normalized()
+
+	if _frame.jump_pressed:
+		var push := along.normalized() * speed + normal * settings.wallrun_jump_push
+		velocity = Vector3(push.x, settings.wallrun_jump_up, push.z)
+		if not _replaying:
+			jumped.emit()
+			_broadcast_sound(&"jump")
+		_end_wall_run()
+		move_and_slide()
+		return
+	var wall := _wall_normal_toward(get_world_3d().direct_space_state, -normal)
+	if _frame.crouch_pressed or not has_wish or heading.dot(wish_dir) <= 0.0 \
+			or wall == Vector3.ZERO or speed < settings.wallrun_stay_speed or _wall_time > settings.wallrun_max_duration:
+		_end_wall_run()
+		velocity.y += get_gravity().y * delta
+		move_and_slide()
+		return
+
+	_wall_normal = Vector2(wall.x, wall.z)
+	normal = wall
+	var direction := along.normalized()
+	speed = move_toward(speed, settings.wallrun_speed, settings.wallrun_accel * delta)
+	velocity.x = direction.x * speed - normal.x * settings.wallrun_stick
+	velocity.z = direction.z * speed - normal.z * settings.wallrun_stick
+	var gravity_scale := lerpf(settings.wallrun_gravity_start, settings.wallrun_gravity_end, clampf(_wall_time / settings.wallrun_max_duration, 0.0, 1.0))
+	velocity.y += get_gravity().y * gravity_scale * delta
+	move_and_slide()
+	if is_on_floor():
+		_end_wall_run()
+
+
+func _end_wall_run() -> void:
+	_wall_run = false
+	_wall_cooldown = settings.wallrun_cooldown
 
 
 ## Walking into a step (stairs, a curb) lifts the body onto it instead of stopping it, as
@@ -436,6 +557,16 @@ func _hide_step(rise: float) -> void:
 func _commit_step_pending() -> void:
 	_step_offset += _step_pending
 	_step_pending = 0.0
+
+
+## Leans the view away from the wall during a wall run and back afterwards.
+func _settle_view_roll(delta: float) -> void:
+	var target := 0.0
+	if _wall_run:
+		var right := Basis(Vector3.UP, yaw) * Vector3.RIGHT
+		# Wall on the right: its normal points left (negative along `right`), and the view leans left (positive roll).
+		target = -signf(Vector3(_wall_normal.x, 0.0, _wall_normal.y).dot(right)) * deg_to_rad(settings.wallrun_camera_roll)
+	_view_roll = lerpf(_view_roll, target, 1.0 - exp(-10.0 * delta))
 
 
 ## Critically damped spring on `_step_offset` toward 0 (exact solution, so frame rate doesn't matter).
@@ -674,6 +805,7 @@ func _publish_snapshot() -> void:
 		velocity.x, velocity.y, velocity.z,
 		yaw, pitch, stance, _slide_elapsed, 1.0 if _grounded else 0.0,
 		_mantle, _mantle_target.x, _mantle_target.y, _mantle_target.z, _mantle_speed,
+		1.0 if _wall_run else 0.0, _wall_normal.x, _wall_normal.y, _wall_time, _wall_cooldown,
 		tick,
 	])
 	assert(snapshot.size() == Snap.SIZE)
@@ -834,6 +966,10 @@ func _restore_state(data: PackedFloat32Array) -> void:
 	_grounded = data[Snap.ON_FLOOR] > 0.5
 	_mantle_target = _snap_vector(data, Snap.TARGET_X)
 	_mantle_speed = data[Snap.MANTLE_SPEED]
+	_wall_run = data[Snap.WALL_RUN] > 0.5
+	_wall_normal = Vector2(data[Snap.WALL_NX], data[Snap.WALL_NZ])
+	_wall_time = data[Snap.WALL_TIME]
+	_wall_cooldown = data[Snap.WALL_COOLDOWN]
 
 
 ## Predicting client: the server tick whose state other players are drawn at right

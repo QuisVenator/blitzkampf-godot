@@ -130,6 +130,7 @@ func _run() -> void:
 
 	await _test_ledge()
 	await _test_stairs()
+	await _test_wall_run()
 	await _test_akimbo()
 	await _test_pause()
 	await _test_bot()
@@ -232,6 +233,66 @@ func _test_stairs() -> void:
 	body.queue_free()
 	_player.input.set_look(0.0, 0.0)
 	await _frames(5)
+
+
+## A long wall at x = -11.5: a fast airborne body alongside it runs on it (sinking slowly, keeping its
+## speed), a jump press throws it off the wall, a low start or a head-on wall is no run.
+func _test_wall_run() -> void:
+	Input.action_release(&"move_forward")
+	var body := StaticBody3D.new()
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(1.0, 10.0, 40.0)
+	shape.shape = box
+	body.add_child(shape)
+	body.position = Vector3(-12.0, 5.0, -2.0)
+	_main.add_child(body)
+	await _frames(2)
+
+	_player.teleport(Vector3(-11.2, 3.0, 16.0), 0.0)
+	await _frames(10)
+	_player.velocity = Vector3(0.0, 0.0, -9.0)
+	Input.action_press(&"move_forward")
+	await _frames(25)
+	var running: bool = _player.get("_wall_run")
+	_check("a fast jump along a wall starts a wall run", running)
+	_check("the run keeps its speed (%.1f)" % _player.horizontal_speed(), _player.horizontal_speed() > 9.0)
+	_check("and barely sinks", _player.global_position.y > 2.0)
+	_check("the view leans away from the wall (roll %.2f)" % _player.get("_view_roll"), absf(_player.get("_view_roll")) > 0.05)
+	Input.action_press(&"jump")
+	await _frames(2)
+	Input.action_release(&"jump")
+	_check("a jump press wall-jumps off the wall", not _player.get("_wall_run") and _player.velocity.x > 4.0 and _player.velocity.y > 4.0)
+	await _frames(6)
+	_check("the cooldown stops an instant re-grab", not _player.get("_wall_run"))
+	Input.action_release(&"move_forward")
+	await _frames(60)
+
+	_player.teleport(Vector3(-11.2, 0.2, 16.0), 0.0)
+	await _frames(5)
+	_player.velocity = Vector3(0.0, 0.0, -9.0)
+	Input.action_press(&"move_forward")
+	var started := false
+	for i in 40:
+		await _frames(1)
+		started = started or _player.get("_wall_run")
+	Input.action_release(&"move_forward")
+	_check("no wall run near the floor", not started)
+
+	_player.teleport(Vector3(-8.0, 3.0, 5.0), PI / 2.0)
+	_player.input.set_look(PI / 2.0, 0.0)
+	await _frames(5)
+	_player.velocity = Vector3(-9.0, 0.0, 0.0)
+	Input.action_press(&"move_forward")
+	started = false
+	for i in 30:
+		await _frames(1)
+		started = started or _player.get("_wall_run")
+	Input.action_release(&"move_forward")
+	_check("no wall run head-on into a wall", not started)
+	body.queue_free()
+	_player.input.set_look(0.0, 0.0)
+	await _frames(30)
 
 
 ## Console commands run offline through the same path as on a server.

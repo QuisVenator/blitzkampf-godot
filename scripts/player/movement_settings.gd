@@ -55,6 +55,34 @@ extends Resource
 @export var mantle_forward_speed := 5.0
 @export_range(0.0, 1.0) var mantle_momentum := 1.0
 
+@export_group("Wall run")
+## Jump or fall along a wall at this horizontal speed to start running on it.
+@export var wallrun_min_speed := 6.0
+## The run ends when the speed along the wall drops below this.
+@export var wallrun_stay_speed := 3.0
+## A wall this close to the body's side counts.
+@export var wallrun_reach := 0.35
+## The feet must be at least this high above the floor to start a run.
+@export var wallrun_min_height := 0.6
+@export var wallrun_max_duration := 4.0
+## Speed along the wall, which the run accelerates toward.
+@export var wallrun_speed := 10.0
+@export var wallrun_accel := 25.0
+## Gravity multiplier at the start and at the end of a run (it grows over the duration).
+@export var wallrun_gravity_start := 0.0
+@export var wallrun_gravity_end := 0.25
+## Vertical speed when a run starts (0 = purely horizontal; positive hops up onto the wall).
+@export var wallrun_entry_vertical_speed := 0.0
+## Speed pressing the body into the wall, so it keeps contact.
+@export var wallrun_stick := 1.5
+## Wall jump: up speed and speed away from the wall (the speed along it is kept).
+@export var wallrun_jump_up := 6.5
+@export var wallrun_jump_push := 6.0
+## Seconds after leaving a wall before any wall can be grabbed again.
+@export var wallrun_cooldown := 0.4
+## Camera roll (degrees) away from the wall while running.
+@export var wallrun_camera_roll := 10.0
+
 @export_group("Body")
 @export var standing_height := 1.8
 @export var crouch_height := 0.9

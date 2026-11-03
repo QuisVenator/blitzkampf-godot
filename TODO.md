@@ -5,6 +5,7 @@ Rough order of intent, not a commitment. Tick items off (and move them to Done) 
 ## Next up
 - [ ] Pause menu: add more options (mouse sensitivity, volume, key rebinding, akimbo button scheme)
 - [ ] Movement ideas (collect and estimate; tune via `MovementSettings` / `QuakeMovement`)
+  - [x] Wall run (Titanfall-style, wall jump, camera roll): first version, tune the feel; animation, sound, wall-run entry/exit effects still open
   - [x] Ledge climb: first version (jump toward a ledge, 2/3 rule, timed mantle; feel to tune; animation, sound, camera effect still open)
 - [ ] Polish the viewmodel animations (draw, fire, reload exist as a basic start; hand/slide movement, easing, per-weapon differences) and add a mouse-sway like the tutorial's
 - [ ] Tune the viewmodel hand poses in the editor (`scenes/weapons/*_viewmodel.tscn`, use the PreviewCamera); the left hand of the SMG/shotgun and akimbo especially

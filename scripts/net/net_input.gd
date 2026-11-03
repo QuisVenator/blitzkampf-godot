@@ -6,7 +6,7 @@ extends Node
 ## Single player and the host's own player need neither.
 
 var _remote: RemoteInput
-var _counts: Array[int] = [0, 0, 0, 0]
+var _counts: Array[int] = [0, 0, 0, 0, 0]
 ## The previous tick's packet, sent along with the next so one lost packet is harmless.
 var _previous := PackedFloat32Array()
 ## Packets waiting out the simulated lag (`NetSim`): [release time ms, packet].
@@ -35,6 +35,7 @@ func _physics_process(_delta: float) -> void:
 	_counts[RemoteInput.Count.RELOAD] += 1 if frame.reload_pressed else 0
 	_counts[RemoteInput.Count.INTERACT] += 1 if frame.interact_pressed else 0
 	_counts[RemoteInput.Count.INTERACT_ALT] += 1 if frame.interact_alt_pressed else 0
+	_counts[RemoteInput.Count.JUMP] += 1 if frame.jump_pressed else 0
 	var packet := RemoteInput.pack(frame, _counts)
 	var combined := packet.duplicate()
 	combined.append_array(_previous)
