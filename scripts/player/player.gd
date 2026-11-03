@@ -31,7 +31,7 @@ enum Snap {
 	POS_X, POS_Y, POS_Z,
 	VEL_X, VEL_Y, VEL_Z,
 	YAW, PITCH, STANCE, SLIDE, ON_FLOOR,
-	MANTLE, TARGET_X, TARGET_Y, TARGET_Z,  # ledge climb phase and where it ends
+	MANTLE, TARGET_X, TARGET_Y, TARGET_Z, MANTLE_SPEED,  # ledge climb: phase, where it ends, approach speed
 	TICK,  # the server's physics tick
 	SIZE,
 }
@@ -140,6 +140,7 @@ var _error_offset := Vector3.ZERO
 var _slide_elapsed := 0.0
 var _mantle := Mantle.NONE
 var _mantle_target := Vector3.ZERO
+var _mantle_speed := 0.0  # horizontal speed on approach
 var _distance_since_step := 0.0
 var _eye_height := 0.0
 var _eye_tween: Tween
@@ -357,6 +358,7 @@ func _simulate(delta: float) -> void:
 		if target.is_finite():
 			_mantle = Mantle.RISING
 			_mantle_target = target
+			_mantle_speed = horizontal_speed()
 			_simulate_mantle(delta)
 			return
 
@@ -405,29 +407,42 @@ func _find_ledge(direction: Vector2) -> Vector3:
 	return target
 
 
-## One tick of a ledge climb: no steering and no gravity. First up until the feet are level
-## with the ledge, then forward over the lip. Crouch lets go; running into something that
-## stops the climb aborts it.
+## One tick of a ledge climb: no steering and no gravity. The body is carried up the wall
+## (speeding up from whatever vertical speed it had, easing off near the lip) and, once close
+## to the lip, over it at the approach speed, so the two blend into one arc. Crouch lets go;
+## running into something that stops the climb aborts it.
 func _simulate_mantle(delta: float) -> void:
 	if _frame.crouch_pressed:
 		_end_mantle(Vector3.ZERO)
 		return
 	var to_target := _mantle_target - global_position
-	if _mantle == Mantle.RISING:
-		var step := settings.mantle_rise_speed * delta
-		velocity = Vector3(0.0, minf(to_target.y, step) / delta, 0.0)
-		if to_target.y <= step:
-			_mantle = Mantle.FORWARD
+	var rise_left := maxf(to_target.y, 0.0)
+	var rise_speed := settings.mantle_rise_speed * clampf(sqrt(rise_left / settings.mantle_ease_distance), 0.25, 1.0)
+	velocity.y = minf(move_toward(velocity.y, rise_speed, settings.mantle_accel * delta), rise_left / delta)
+	if _mantle == Mantle.RISING and rise_left <= settings.mantle_overlap:
+		_mantle = Mantle.FORWARD
+
+	var flat := Vector3(to_target.x, 0.0, to_target.z)
+	var speed := 0.0
+	var arrived := false
+	if _mantle == Mantle.FORWARD:
+		var carry := maxf(settings.mantle_forward_speed, _mantle_speed * settings.mantle_momentum)
+		speed = move_toward(Vector2(velocity.x, velocity.z).length(), carry, settings.mantle_carry_accel * delta)
+		arrived = flat.length() <= maxf(speed * delta, 0.02) and rise_left <= 0.02
+		var horizontal := flat.limit_length(speed * delta) / delta
+		velocity.x = horizontal.x
+		velocity.z = horizontal.z
 	else:
-		var flat := Vector3(to_target.x, 0.0, to_target.z)
-		var step := settings.mantle_forward_speed * delta
-		velocity = flat.limit_length(step) / delta
-		if flat.length() <= step:
-			_end_mantle(flat.normalized() * settings.mantle_exit_speed if flat.length() > 0.001 else Vector3.ZERO)
+		velocity.x = 0.0
+		velocity.z = 0.0
+	if arrived:
+		_end_mantle(flat.normalized() * speed)
+		return
+
 	var expected := velocity.length() * delta
 	var before := global_position
 	move_and_slide()
-	if _mantle != Mantle.NONE and expected > 0.001 and global_position.distance_to(before) < expected * 0.1:
+	if expected > 0.001 and global_position.distance_to(before) < expected * 0.1:
 		_end_mantle(Vector3.ZERO)
 
 
@@ -538,7 +553,7 @@ func _publish_snapshot() -> void:
 		global_position.x, global_position.y, global_position.z,
 		velocity.x, velocity.y, velocity.z,
 		yaw, pitch, stance, _slide_elapsed, 1.0 if is_on_floor() else 0.0,
-		_mantle, _mantle_target.x, _mantle_target.y, _mantle_target.z,
+		_mantle, _mantle_target.x, _mantle_target.y, _mantle_target.z, _mantle_speed,
 		tick,
 	])
 	assert(snapshot.size() == Snap.SIZE)
@@ -697,6 +712,7 @@ func _restore_state(data: PackedFloat32Array) -> void:
 	_slide_elapsed = data[Snap.SLIDE]
 	_mantle = int(data[Snap.MANTLE]) as Mantle
 	_mantle_target = _snap_vector(data, Snap.TARGET_X)
+	_mantle_speed = data[Snap.MANTLE_SPEED]
 
 
 ## Predicting client: the server tick whose state other players are drawn at right

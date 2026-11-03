@@ -31,11 +31,19 @@ extends Resource
 @export var mantle_min_height := 0.2
 ## How far in front of the body a wall still counts as "toward the ledge".
 @export var mantle_reach := 0.4
-## Speed of the vertical part of the climb, then of the part that carries you over the lip.
+## Speed of the climb up the wall; it eases off over the last `mantle_ease_distance` below the lip.
 @export var mantle_rise_speed := 7.0
-@export var mantle_forward_speed := 4.5
-## Horizontal speed you keep when the climb ends.
-@export var mantle_exit_speed := 3.0
+@export var mantle_ease_distance := 0.6
+## The carry over the lip starts this far below the lip, so up and forward blend into one arc.
+@export var mantle_overlap := 0.15
+## How quickly the climb speeds up and slows down (m/s per second); this is the easing.
+@export var mantle_accel := 60.0
+## The same for the carry over the lip (horizontal): high, or a sprint loses time getting going again.
+@export var mantle_carry_accel := 130.0
+## Slowest the carry over the lip may be, and the share of your approach speed it keeps
+## (a sprint into a ledge stays fast).
+@export var mantle_forward_speed := 5.0
+@export_range(0.0, 1.0) var mantle_momentum := 1.0
 
 @export_group("Body")
 @export var standing_height := 1.8
