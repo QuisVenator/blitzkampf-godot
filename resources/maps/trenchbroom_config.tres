@@ -12,3 +12,4 @@ script = ExtResource("6_yd2io")
 game_name = "Blitzkampf"
 palette_path = "addons/func_godot/palette.lmp"
 fgd_file = ExtResource("4_6olcg")
+default_uv_scale = Vector2(0.125, 0.125)

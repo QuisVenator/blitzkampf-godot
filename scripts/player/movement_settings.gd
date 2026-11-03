@@ -23,6 +23,16 @@ extends Resource
 ## Seconds at the start of a slide where speed is held flat.
 @export var slide_sustain_duration := 0.15
 
+@export_group("Stairs")
+## Highest step the body walks up without jumping (stairs, curbs). Also how far down it
+## stays glued to the floor, so walking down stairs doesn't turn into a series of falls.
+@export var step_height := 0.35
+## Steps lower than this are left to the engine (ramps and bumps need no lift).
+@export var step_min_height := 0.08
+## How tightly the camera follows steps (spring frequency, 1/s). Lower is smoother but the view
+## sags further behind on a long staircase (about 2 x climb speed / this); higher is crisper.
+@export var step_view_smoothing := 28.0
+
 @export_group("Ledge climb")
 ## Jumping toward a ledge climbs it once at least this fraction of the standing body is
 ## above the ledge's top (so the top is at most `(1 - fraction) * standing_height` above the feet).

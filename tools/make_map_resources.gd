@@ -25,12 +25,16 @@ func _initialize() -> void:
 	settings.base_texture_dir = "res://textures"
 	# Maps are built at runtime, possibly from an exported game: nothing may be written to res://.
 	settings.save_generated_materials = false
+	# The addon's own default material samples nearest-neighbour; ours filters with mipmaps and
+	# anisotropy (the textures need mipmaps enabled in their import settings too).
+	settings.default_material = load("res://resources/maps/default_material.tres")
 	_save(settings, SETTINGS_PATH)
 
 	var config := TrenchBroomGameConfig.new()
 	config.game_name = GAME_NAME
 	config.fgd_file = fgd
 	config.textures_root_folder = "textures"
+	config.default_uv_scale = Vector2(0.125, 0.125)  # 512 px textures cover 2 m
 	config.palette_path = "addons/func_godot/palette.lmp"
 	_save(config, CONFIG_PATH)
 	quit()

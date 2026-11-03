@@ -137,7 +137,12 @@ var _server_tick_ms := 0
 var _replaying := false
 ## Visible correction after a reconcile; fades to zero so the view never jumps.
 var _error_offset := Vector3.ZERO
+var _step_offset := 0.0  # camera height offset hiding step lifts, a critically damped spring
+var _step_velocity := 0.0
+var _step_pending := 0.0  # offset from lifts in the latest physics tick, ramped in as the body interpolates
+var _step_pending_tick := -1
 var _slide_elapsed := 0.0
+var _grounded := false  # on the floor, or just above one (stairs): see `_floor_height_below`
 var _mantle := Mantle.NONE
 var _mantle_target := Vector3.ZERO
 var _mantle_speed := 0.0  # horizontal speed on approach
@@ -162,6 +167,7 @@ func _ready() -> void:
 	input.mouse_sensitivity = settings.mouse_sensitivity
 	_eye_height = settings.eye_height
 	_apply_body_height(false)
+	floor_snap_length = settings.step_height
 	_visual.visible = not is_local
 	_show_held_weapons()
 	if is_local:
@@ -237,6 +243,9 @@ func teleport(to: Vector3, new_yaw: float) -> void:
 	_pose_history.clear()
 	velocity = Vector3.ZERO
 	_mantle = Mantle.NONE
+	_step_offset = 0.0
+	_step_velocity = 0.0
+	_step_pending = 0.0
 	yaw = new_yaw
 	pitch = 0.0
 	input.set_look(yaw, pitch)
@@ -254,18 +263,19 @@ func _process(delta: float) -> void:
 		yaw = input.look_yaw
 		pitch = input.look_pitch
 		_error_offset = _error_offset.lerp(Vector3.ZERO, 1.0 - exp(-ERROR_SMOOTH_RATE * delta))
+		_settle_step_offset(delta)
 	elif not is_multiplayer_authority():
 		_interpolate_remote()
 	if is_local or is_multiplayer_authority():
 		_update_camera()
 	if _visual.visible:
 		_visual.global_rotation = Vector3(0.0, yaw, 0.0)
-		var grounded := is_on_floor() if is_multiplayer_authority() else _remote_on_floor
+		var grounded := _grounded if is_multiplayer_authority() else _remote_on_floor
 		_visual.update(horizontal_speed(), stance != Stance.STANDING, grounded, alive, pitch)
 
 
 func _update_camera() -> void:
-	var eye_position := get_global_transform_interpolated().origin + Vector3.UP * _eye_height + _error_offset
+	var eye_position := get_global_transform_interpolated().origin + Vector3.UP * (_eye_height + _step_offset + _step_pending * Engine.get_physics_interpolation_fraction()) + _error_offset
 	head.global_transform = Transform3D(Basis.from_euler(Vector3(pitch, yaw, 0.0), EULER_ORDER_YXZ), eye_position)
 
 
@@ -310,7 +320,10 @@ func _simulate(delta: float) -> void:
 	var has_wish := _frame.move != Vector2.ZERO
 	var wish_world := Basis(Vector3.UP, _frame.yaw) * Vector3(_frame.move.x, 0.0, _frame.move.y)
 	var wish_dir := Vector2(wish_world.x, wish_world.z).normalized()
-	var grounded := is_on_floor()
+	# Walking off an edge or down stairs stays grounded (see `_floor_height_below`); a body that
+	# was in the air does not become grounded just by being near the floor (no higher re-jumps).
+	var grounded := is_on_floor() or (_grounded and _floor_just_below())
+	_grounded = grounded
 
 	if not alive:
 		# Dead: no control, but still fall and settle.
@@ -362,9 +375,116 @@ func _simulate(delta: float) -> void:
 			_simulate_mantle(delta)
 			return
 
+	var height_before := global_position.y
+	var stepped := false
+	if grounded:
+		stepped = _step_up(delta)
 	move_and_slide()
+	if grounded and not is_on_floor():
+		stepped = _step_down() or stepped
+	if stepped:
+		# What the body visibly jumped this tick, however it got there (the lift, then settling onto the step).
+		_hide_step(global_position.y - height_before)
 	if not _replaying:
 		_track_footsteps(has_wish, delta)
+
+
+## Walking into a step (stairs, a curb) lifts the body onto it instead of stopping it, as
+## `move_and_slide` has no step logic of its own. Only when something is in the way, the
+## step is at most `step_height` high, there is room above and the floor on top is walkable;
+## the move then continues from the raised position. The camera is eased through the lift
+## (`_error_offset`), so stairs feel like a glide, not a staircase of pops.
+func _step_up(delta: float) -> bool:
+	var motion := Vector3(velocity.x, 0.0, velocity.z) * delta
+	if motion.is_zero_approx():
+		return false
+	var from := global_transform
+	if not test_move(from, motion):
+		return false
+	var up := Vector3.UP * settings.step_height
+	if test_move(from, up):
+		return false
+	var raised := from.translated(up)
+	# Look a little further ahead than this tick's move, so the probe reaches the tread.
+	var reach := motion.normalized() * maxf(motion.length(), 0.15)
+	if test_move(raised, reach):
+		return false
+	var landing := KinematicCollision3D.new()
+	if not test_move(raised.translated(reach), -up, landing) or landing.get_normal().y < cos(floor_max_angle):
+		return false
+	var lift := landing.get_position().y - global_position.y
+	if lift < settings.step_min_height or lift > settings.step_height:
+		return false
+	global_position.y += lift + 0.001
+	return true
+
+
+## The body just moved up (`rise` > 0) or down by a step: the camera stays where it was and
+## then glides to the new height (`_settle_step_offset`). The body is drawn interpolating from
+## its previous tick's position, so the offset ramps in with the same fraction (`_step_pending`)
+## and only joins the spring once that tick is over; applied at once, the camera would dip first.
+func _hide_step(rise: float) -> void:
+	if not is_local or _replaying:
+		return
+	var tick := Engine.get_physics_frames()
+	if _step_pending_tick != tick:
+		_commit_step_pending()
+	_step_pending_tick = tick
+	_step_pending -= rise
+
+
+func _commit_step_pending() -> void:
+	_step_offset += _step_pending
+	_step_pending = 0.0
+
+
+## Critically damped spring on `_step_offset` toward 0 (exact solution, so frame rate doesn't matter).
+func _settle_step_offset(delta: float) -> void:
+	if _step_pending != 0.0 and Engine.get_physics_frames() > _step_pending_tick:
+		_commit_step_pending()
+	if _step_offset == 0.0 and _step_velocity == 0.0:
+		return
+	var omega := settings.step_view_smoothing
+	var decay := exp(-omega * delta)
+	var push := _step_velocity + omega * _step_offset
+	_step_offset = (_step_offset + push * delta) * decay
+	_step_velocity = (_step_velocity - omega * push * delta) * decay
+	if absf(_step_offset) < 0.0005 and absf(_step_velocity) < 0.005:
+		_step_offset = 0.0
+		_step_velocity = 0.0
+
+
+## Height of the walkable floor less than `step_height` straight below a body that is not
+## rising, else NAN. The engine's own idea of "on the
+## floor" fails on stairs: the capsule rests on a step's edge at a steep angle, which doesn't
+## count, so without this walking down stairs would be a chain of small falls.
+func _floor_height_below() -> float:
+	if velocity.y > 0.0:
+		return NAN
+	var query := PhysicsRayQueryParameters3D.create(
+		global_position + Vector3.UP * 0.1, global_position + Vector3.DOWN * settings.step_height, LEDGE_MASK)
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty() or hit.normal.y < cos(floor_max_angle):
+		return NAN
+	return hit.position.y
+
+
+func _floor_just_below() -> bool:
+	return not is_nan(_floor_height_below())
+
+
+## After a move that left the engine floor but kept the body "grounded" (see above): settle
+## onto the floor below, so the body follows the stairs down instead of hovering.
+func _step_down() -> bool:
+	var height := _floor_height_below()
+	if is_nan(height):
+		return false
+	var drop := global_position.y - height
+	if drop < 0.001:
+		return false
+	velocity.y = 0.0
+	move_and_collide(Vector3.DOWN * drop)
+	return true
 
 
 ## Where a ledge climb toward `direction` would end (the body's origin standing on top), or
@@ -533,7 +653,7 @@ func _can_stand() -> bool:
 
 
 func _track_footsteps(has_wish: bool, delta: float) -> void:
-	if not (is_on_floor() and has_wish and stance != Stance.SLIDING):
+	if not (_grounded and has_wish and stance != Stance.SLIDING):
 		return
 	_distance_since_step += horizontal_speed() * delta
 	if _distance_since_step >= settings.footstep_distance:
@@ -552,7 +672,7 @@ func _publish_snapshot() -> void:
 		_frame.sequence,
 		global_position.x, global_position.y, global_position.z,
 		velocity.x, velocity.y, velocity.z,
-		yaw, pitch, stance, _slide_elapsed, 1.0 if is_on_floor() else 0.0,
+		yaw, pitch, stance, _slide_elapsed, 1.0 if _grounded else 0.0,
 		_mantle, _mantle_target.x, _mantle_target.y, _mantle_target.z, _mantle_speed,
 		tick,
 	])
@@ -711,6 +831,7 @@ func _restore_state(data: PackedFloat32Array) -> void:
 	stance = int(data[Snap.STANCE]) as Stance
 	_slide_elapsed = data[Snap.SLIDE]
 	_mantle = int(data[Snap.MANTLE]) as Mantle
+	_grounded = data[Snap.ON_FLOOR] > 0.5
 	_mantle_target = _snap_vector(data, Snap.TARGET_X)
 	_mantle_speed = data[Snap.MANTLE_SPEED]
 

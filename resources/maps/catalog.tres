@@ -16,6 +16,12 @@ id = &"test_arena_map"
 display_name = "Test arena (TrenchBroom)"
 map_file = "res://maps/test_arena.map"
 
+[sub_resource type="Resource" id="Resource_large"]
+script = ExtResource("2_definition")
+id = &"test_large"
+display_name = "Large test map"
+map_file = "res://maps/test_large.map"
+
 [resource]
 script = ExtResource("1_catalog")
-maps = Array[ExtResource("2_definition")]([SubResource("Resource_arena"), SubResource("Resource_arena_map")])
+maps = Array[ExtResource("2_definition")]([SubResource("Resource_arena"), SubResource("Resource_arena_map"), SubResource("Resource_large")])

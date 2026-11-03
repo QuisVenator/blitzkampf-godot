@@ -1,12 +1,13 @@
 extends SceneTree
 ## Writes the prototype textures used by TrenchBroom maps to res://textures/ (PNG, so
-## TrenchBroom can show them too): flat colours with a 1 m grid (a 128 px texture covers
-## 4 m at TrenchBroom's default scale of 1 px per unit, 32 units = 1 m), and copies FuncGodot's
-## special clip/skip/origin textures next to them.
+## TrenchBroom can show them too): flat colours with a 1 m grid, and copies FuncGodot's
+## special clip/skip/origin textures next to them. All textures are 512 px and the maps use
+## a UV scale of 0.125, so one texture covers 2 m (32 units = 1 m; see
+## tools/make_map_resources.gd, default_uv_scale).
 ## Run: godot --headless --path . -s res://tools/make_textures.gd, then godot --headless --path . --import
 
-const SIZE := 128
-const GRID := 32
+const SIZE := 512
+const GRID := 256  # 1 m
 ## Texture name -> colour (the greybox palette of the old test arena).
 const COLORS := {
 	"ground": Color(0.2275, 0.2275, 0.2275),
@@ -28,7 +29,7 @@ func _initialize() -> void:
 		var line := base.darkened(0.3)
 		for x in SIZE:
 			for y in SIZE:
-				if x % GRID < 2 or y % GRID < 2:
+				if x % GRID < 4 or y % GRID < 4:
 					image.set_pixel(x, y, line)
 		image.save_png("res://textures/prototype/%s.png" % texture_name)
 	for special: String in SPECIAL:

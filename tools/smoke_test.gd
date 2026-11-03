@@ -129,6 +129,7 @@ func _run() -> void:
 	_check("dropped pistol kept its ammo", _weapons.primary.in_mag == 8 and _weapons.primary.reserve == 23)
 
 	await _test_ledge()
+	await _test_stairs()
 	await _test_akimbo()
 	await _test_pause()
 	await _test_bot()
@@ -174,6 +175,63 @@ func _test_ledge() -> void:
 	Input.action_release(&"move_forward")
 	_check("a too-high ledge is not climbed", _player.global_position.y < 1.5)
 	await _frames(20)
+
+
+## Six steps of 25 cm (50 cm deep) built here, walked up and down; then a 60 cm wall, which stays a wall.
+func _test_stairs() -> void:
+	Input.action_release(&"move_forward")
+	var body := StaticBody3D.new()
+	for i in 6:
+		var shape := CollisionShape3D.new()
+		var box := BoxShape3D.new()
+		box.size = Vector3(3.0, 0.25 * (i + 1), 0.5)
+		shape.shape = box
+		shape.position = Vector3(0.0, box.size.y / 2.0, -0.25 - 0.5 * i)
+		body.add_child(shape)
+	var wall := CollisionShape3D.new()
+	var wall_box := BoxShape3D.new()
+	wall_box.size = Vector3(3.0, 0.6, 0.5)
+	wall.shape = wall_box
+	wall.position = Vector3(0.0, 0.3, -6.25)
+	body.add_child(wall)
+	# Away from everything else in the arena; the south wall is at z = 20.
+	body.position = Vector3(-14.0, 0.0, 17.0)
+	_main.add_child(body)
+	await _frames(2)
+	_player.teleport(Vector3(-14.0, 0.0, 19.0), 0.0)
+	await _frames(10)
+	Input.action_press(&"move_forward")
+	var top := 0.0
+	var eye := _player.head.global_position.y
+	var eye_dips := 0
+	var eye_jump := 0.0
+	for i in 70:
+		await _frames(1)
+		top = maxf(top, _player.global_position.y)
+		var now := _player.head.global_position.y
+		if i < 45 and now < eye - 0.002:
+			eye_dips += 1
+		if i < 45:  # the climb itself; later the walk runs off the top and falls
+			eye_jump = maxf(eye_jump, absf(now - eye))
+		eye = now
+	_check("walks up stairs without jumping (top %.2f)" % top, absf(top - 1.5) < 0.05)
+	_check("the view glides up the stairs (no dips, biggest jump %.2f m)" % eye_jump, eye_dips == 0 and eye_jump < 0.15)
+	_check("a 60 cm wall stops a walk", _player.global_position.z > 17.0 - 6.5 - 0.5)
+	Input.action_release(&"move_forward")
+	_player.teleport(Vector3(-14.0, 1.55, 17.0 - 3.0), 0.0)
+	_player.input.set_look(PI, 0.0)
+	await _frames(5)
+	Input.action_press(&"move_forward")
+	var airborne := 0
+	for i in 60:
+		await _frames(1)
+		if not _player.get("_grounded"):
+			airborne += 1
+	Input.action_release(&"move_forward")
+	_check("walks down stairs staying on them", airborne == 0 and _player.global_position.y < 0.05)
+	body.queue_free()
+	_player.input.set_look(0.0, 0.0)
+	await _frames(5)
 
 
 ## Console commands run offline through the same path as on a server.

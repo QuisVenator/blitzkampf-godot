@@ -1,0 +1,10 @@
+These textures are from ambientCG.com, licensed CC0 1.0 (public domain).
+https://creativecommons.org/publicdomain/zero/1.0/
+
+concrete.png: https://ambientcg.com/view?id=Concrete034
+bricks.png: https://ambientcg.com/view?id=Bricks059
+metal.png: https://ambientcg.com/view?id=Metal032
+painted_metal.png: https://ambientcg.com/view?id=PaintedMetal012
+tiles.png: https://ambientcg.com/view?id=Tiles074
+
+Resized to 512 px by tools/fetch_textures.py.

@@ -21,6 +21,7 @@ Rough order of intent, not a commitment. Tick items off (and move them to Done) 
 - [ ] Melee weapons (close-range hit shape, swing animations; may need a weapon-slot rethink)
 - [ ] Multiplayer (Godot high-level multiplayer; server-authoritative pickups, ammo, hits, spread)
 - [x] TrenchBroom maps via FuncGodot: runtime build, map selector, player/weapon spawner/target/sun/environment entities, starter `maps/test_arena.map`
+- [ ] Try editing `maps/test_large.map` in TrenchBroom end to end (move brushes, retexture, spawner checkboxes) and fix whatever hurts
 - [ ] More TrenchBroom entities (props, doors, triggers, jump pads, bot navigation hints) and a real second map
 - [ ] Real audio, more maps
 
