@@ -7,3 +7,4 @@ script = ExtResource("1_script")
 slide_entry_speed = 13.0
 slide_friction = 2.0
 slide_sustain_duration = 0.2
+speed_fov_full_speed = 13.0

@@ -42,6 +42,13 @@ func _run() -> void:
 	Input.action_press(&"sprint")
 	await _frames(30)
 	_check_near("sprint speed ~11", _player.horizontal_speed(), 11.0, 0.1)
+	# Aiming down sights ends the sprint (back to walking speed); letting go resumes it.
+	Input.action_press(&"aim")
+	await _frames(20)
+	_check_near("aiming ends the sprint", _player.horizontal_speed(), 7.0, 0.3)
+	Input.action_release(&"aim")
+	await _frames(25)
+	_check_near("sprint resumes after aiming", _player.horizontal_speed(), 11.0, 0.1)
 
 	# Slide: fresh crouch press while sprinting.
 	Input.action_press(&"crouch")
@@ -49,6 +56,11 @@ func _run() -> void:
 	_check("slide started", _player.stance == Player.Stance.SLIDING)
 	_check("slide speed >= 10.9", _player.horizontal_speed() >= 10.9)
 	_check("the view widens in a fast slide (fov %.1f)" % _player.camera.fov, _player.camera.fov > 80.0)
+	# Aiming during a slide doesn't end it.
+	Input.action_press(&"aim")
+	await _frames(4)
+	_check("aiming does not end a slide", _player.stance == Player.Stance.SLIDING and _player.horizontal_speed() > 9.5)
+	Input.action_release(&"aim")
 	await _frames(20)
 	var mid_slide := _player.horizontal_speed()
 	await _frames(20)
@@ -263,6 +275,10 @@ func _test_wall_run() -> void:
 	_check("the run keeps its speed (%.1f)" % _player.horizontal_speed(), _player.horizontal_speed() > 9.0)
 	_check("and barely sinks", _player.global_position.y > 2.0)
 	_check("the view leans away from the wall (roll %.2f)" % _player.get("_view_roll"), absf(_player.get("_view_roll")) > 0.05)
+	Input.action_press(&"aim")
+	await _frames(6)
+	_check("aiming does not end a wall run", _player.get("_wall_run") and _player.horizontal_speed() > 9.0)
+	Input.action_release(&"aim")
 	Input.action_press(&"jump")
 	await _frames(2)
 	Input.action_release(&"jump")

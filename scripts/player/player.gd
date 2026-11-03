@@ -151,6 +151,9 @@ var _wall_run := false
 var _wall_normal := Vector2.ZERO  # horizontal, pointing from the wall toward the body
 var _wall_time := 0.0
 var _wall_cooldown := 0.0
+## True while the sights are up (set by the weapon manager): sprinting is off then, but a slide
+## or a wall run carries on (they have their own speeds).
+var aiming := false
 ## Extra camera FOV (degrees) from speed (see `MovementSettings.speed_fov_boost`); the weapon manager adds it to the camera's FOV.
 var speed_fov_boost := 0.0
 var _view_roll := 0.0  # camera roll (radians) while wall running, local view only
@@ -741,7 +744,7 @@ func _max_speed(has_wish: bool, grounded: bool) -> float:
 		return settings.max_air_speed
 	if stance != Stance.STANDING:
 		return settings.max_crouch_speed
-	if has_wish and _frame.sprint:
+	if has_wish and _frame.sprint and not aiming:
 		return settings.max_sprint_speed
 	return settings.max_ground_speed
 
@@ -752,7 +755,7 @@ func _max_speed(has_wish: bool, grounded: bool) -> float:
 func _update_stance(has_wish: bool, wish_dir: Vector2, grounded: bool, delta: float) -> void:
 	if _frame.crouch_pressed and stance == Stance.STANDING:
 		_set_stance(Stance.CROUCHING)
-		if grounded and has_wish and _frame.sprint:
+		if grounded and has_wish and _frame.sprint and not aiming:
 			_start_slide(wish_dir)
 
 	if stance == Stance.SLIDING:

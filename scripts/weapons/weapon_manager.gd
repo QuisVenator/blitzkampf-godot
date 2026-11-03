@@ -324,6 +324,7 @@ func _update_aiming() -> void:
 	if wants_aim == _aiming:
 		return
 	_aiming = wants_aim
+	_player.aiming = wants_aim
 	_move_to_pose(_aiming)
 	aiming_changed.emit(_aiming)
 
