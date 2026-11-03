@@ -1,9 +1,8 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://5bhgn70k0xjh"]
 
-[ext_resource type="Script" path="res://scripts/player/viewmodel_view.gd" id="1_view"]
+[ext_resource type="Script" uid="uid://b6gxpx7o64uah" path="res://scripts/player/viewmodel_view.gd" id="1_view"]
 
-[node name="ViewmodelView" type="SubViewportContainer"]
-physics_interpolation_mode = 2
+[node name="ViewmodelView" type="SubViewportContainer" unique_id=145709617]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -13,26 +12,24 @@ mouse_filter = 2
 stretch = true
 script = ExtResource("1_view")
 
-[node name="SubViewport" type="SubViewport" parent="."]
+[node name="SubViewport" type="SubViewport" parent="." unique_id=871814989]
 transparent_bg = true
-msaa_3d = 2
 handle_input_locally = false
-size = Vector2i(1152, 648)
+msaa_3d = 2
+size = Vector2i(1920, 1080)
 render_target_update_mode = 4
 
-[node name="Camera" type="Camera3D" parent="SubViewport"]
+[node name="Camera" type="Camera3D" parent="SubViewport" unique_id=1077490442]
 cull_mask = 2
-fov = 75.0
-near = 0.05
 far = 10.0
 
-[node name="KeyLight" type="DirectionalLight3D" parent="SubViewport/Camera"]
+[node name="KeyLight" type="DirectionalLight3D" parent="SubViewport/Camera" unique_id=440121284]
 layers = 2
 light_energy = 0.4
 light_cull_mask = 2
 
-[node name="WeaponHolder" type="Node3D" parent="SubViewport/Camera"]
+[node name="WeaponHolder" type="Node3D" parent="SubViewport/Camera" unique_id=171109319]
 transform = Transform3D(0.99802, 0, -0.06279, 0, 1, 0, 0.06279, 0, 0.99802, 0.22, -0.26, -0.42)
 
-[node name="WeaponHolderLeft" type="Node3D" parent="SubViewport/Camera"]
+[node name="WeaponHolderLeft" type="Node3D" parent="SubViewport/Camera" unique_id=2129091315]
 transform = Transform3D(0.99802, 0, 0.06279, 0, 1, 0, -0.06279, 0, 0.99802, -0.22, -0.26, -0.42)

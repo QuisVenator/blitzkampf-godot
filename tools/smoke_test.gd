@@ -128,6 +128,7 @@ func _run() -> void:
 	_check("picked dropped pistol back up", _weapons.primary.definition.id == &"pistol")
 	_check("dropped pistol kept its ammo", _weapons.primary.in_mag == 8 and _weapons.primary.reserve == 23)
 
+	await _test_ledge()
 	await _test_akimbo()
 	await _test_pause()
 	await _test_bot()
@@ -136,6 +137,43 @@ func _run() -> void:
 
 	print("smoke test: %s" % ("OK" if _failures == 0 else "%d FAILED" % _failures))
 	quit(1 if _failures > 0 else 0)
+
+
+## Jumping at BoxA (top 1.5 m) climbs it; BoxB (top 2 m) is too high; walking into it does nothing.
+func _test_ledge() -> void:
+	Input.action_release(&"move_forward")
+	Input.action_release(&"sprint")
+	Input.action_release(&"crouch")
+	await _frames(20)
+	_player.teleport(Vector3(5, 0, -2.5), 0.0)
+	await _frames(5)
+	Input.action_press(&"move_forward")
+	await _frames(20)
+	_check("walking into a ledge does not climb it", _player.global_position.y < 0.1)
+	_player.teleport(Vector3(5, 0, -2.5), 0.0)
+	await _frames(5)
+	Input.action_press(&"jump")
+	await _frames(2)
+	Input.action_release(&"jump")
+	var climbed := false
+	for i in 60:
+		await _frames(1)
+		if _player.is_on_floor() and absf(_player.global_position.y - 1.5) < 0.05:
+			climbed = true
+			break
+	Input.action_release(&"move_forward")
+	await _frames(10)
+	_check("jump toward a low ledge climbs it", climbed)
+	_check("climb ends over the ledge", _player.global_position.z < -4.0)
+	_player.teleport(Vector3(-6, 0, 5.5), 0.0)
+	await _frames(5)
+	Input.action_press(&"move_forward")
+	Input.action_press(&"jump")
+	await _frames(60)
+	Input.action_release(&"jump")
+	Input.action_release(&"move_forward")
+	_check("a too-high ledge is not climbed", _player.global_position.y < 1.5)
+	await _frames(20)
 
 
 ## Console commands run offline through the same path as on a server.

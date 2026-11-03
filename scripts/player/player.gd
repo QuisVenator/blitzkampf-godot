@@ -14,8 +14,12 @@ signal died(attacker: Node)
 signal respawned
 
 enum Stance { STANDING, CROUCHING, SLIDING }
+## Ledge climb: carried up the wall, then over the lip (see `_simulate_mantle`).
+enum Mantle { NONE, RISING, FORWARD }
 
 const DEAD_EYE_HEIGHT := 0.4
+## Physics layer the ledge probes look for: the world.
+const LEDGE_MASK := 1
 ## Bots get ids above this so they never collide with a real peer id.
 const BOT_ID_BASE := 1_000_000
 
@@ -27,6 +31,7 @@ enum Snap {
 	POS_X, POS_Y, POS_Z,
 	VEL_X, VEL_Y, VEL_Z,
 	YAW, PITCH, STANCE, SLIDE, ON_FLOOR,
+	MANTLE, TARGET_X, TARGET_Y, TARGET_Z,  # ledge climb phase and where it ends
 	TICK,  # the server's physics tick
 	SIZE,
 }
@@ -133,6 +138,8 @@ var _replaying := false
 ## Visible correction after a reconcile; fades to zero so the view never jumps.
 var _error_offset := Vector3.ZERO
 var _slide_elapsed := 0.0
+var _mantle := Mantle.NONE
+var _mantle_target := Vector3.ZERO
 var _distance_since_step := 0.0
 var _eye_height := 0.0
 var _eye_tween: Tween
@@ -228,6 +235,7 @@ func teleport(to: Vector3, new_yaw: float) -> void:
 	# Nobody saw this body at its old place as being here: shots mustn't rewind across a teleport.
 	_pose_history.clear()
 	velocity = Vector3.ZERO
+	_mantle = Mantle.NONE
 	yaw = new_yaw
 	pitch = 0.0
 	input.set_look(yaw, pitch)
@@ -312,6 +320,10 @@ func _simulate(delta: float) -> void:
 		move_and_slide()
 		return
 
+	if _mantle != Mantle.NONE:
+		_simulate_mantle(delta)
+		return
+
 	_update_stance(has_wish, wish_dir, grounded, delta)
 
 	var horizontal := Vector2(velocity.x, velocity.z)
@@ -340,9 +352,88 @@ func _simulate(delta: float) -> void:
 		if stance == Stance.CROUCHING and _can_stand():
 			_set_stance(Stance.STANDING)
 
+	if not grounded and has_wish and stance != Stance.SLIDING:
+		var target := _find_ledge(wish_dir)
+		if target.is_finite():
+			_mantle = Mantle.RISING
+			_mantle_target = target
+			_simulate_mantle(delta)
+			return
+
 	move_and_slide()
 	if not _replaying:
 		_track_footsteps(has_wish, delta)
+
+
+## Where a ledge climb toward `direction` would end (the body's origin standing on top), or
+## `Vector3.INF` if there is no climbable ledge. A ledge counts when a wall is within reach
+## at hand height, its top is at least `mantle_min_height` above the feet but no higher than
+## the 2/3 rule allows, and the standing body fits on it.
+func _find_ledge(direction: Vector2) -> Vector3:
+	var space := get_world_3d().direct_space_state
+	var forward := Vector3(direction.x, 0.0, direction.y)
+	var feet := global_position
+	var radius := _capsule.radius
+	var max_height := settings.standing_height * (1.0 - settings.mantle_body_above)
+
+	var wall := PhysicsRayQueryParameters3D.create(
+		feet + Vector3.UP * settings.mantle_min_height,
+		feet + Vector3.UP * settings.mantle_min_height + forward * (radius + settings.mantle_reach),
+		LEDGE_MASK)
+	var wall_hit := space.intersect_ray(wall)
+	if wall_hit.is_empty() or absf(wall_hit.normal.y) > 0.3 or wall_hit.normal.dot(forward) > -0.5:
+		return Vector3.INF
+
+	# Straight down just behind the wall face: the first surface is the ledge's top. If the
+	# ledge is higher than allowed the ray starts inside it and finds nothing.
+	var over: Vector3 = wall_hit.position + forward * 0.05
+	var top := PhysicsRayQueryParameters3D.create(
+		Vector3(over.x, feet.y + max_height, over.z), Vector3(over.x, feet.y + settings.mantle_min_height * 0.5, over.z), LEDGE_MASK)
+	var top_hit := space.intersect_ray(top)
+	if top_hit.is_empty() or top_hit.normal.y < cos(floor_max_angle):
+		return Vector3.INF
+
+	var target: Vector3 = Vector3(over.x, top_hit.position.y, over.z) + forward * (radius + 0.02)
+	target.y += 0.02
+	# The body must fit standing on the ledge.
+	var fit := PhysicsShapeQueryParameters3D.new()
+	fit.shape = _capsule
+	fit.transform = Transform3D(Basis.IDENTITY, target + Vector3.UP * (_capsule.height / 2.0 + 0.02))
+	fit.collision_mask = LEDGE_MASK
+	if not space.intersect_shape(fit, 1).is_empty():
+		return Vector3.INF
+	return target
+
+
+## One tick of a ledge climb: no steering and no gravity. First up until the feet are level
+## with the ledge, then forward over the lip. Crouch lets go; running into something that
+## stops the climb aborts it.
+func _simulate_mantle(delta: float) -> void:
+	if _frame.crouch_pressed:
+		_end_mantle(Vector3.ZERO)
+		return
+	var to_target := _mantle_target - global_position
+	if _mantle == Mantle.RISING:
+		var step := settings.mantle_rise_speed * delta
+		velocity = Vector3(0.0, minf(to_target.y, step) / delta, 0.0)
+		if to_target.y <= step:
+			_mantle = Mantle.FORWARD
+	else:
+		var flat := Vector3(to_target.x, 0.0, to_target.z)
+		var step := settings.mantle_forward_speed * delta
+		velocity = flat.limit_length(step) / delta
+		if flat.length() <= step:
+			_end_mantle(flat.normalized() * settings.mantle_exit_speed if flat.length() > 0.001 else Vector3.ZERO)
+	var expected := velocity.length() * delta
+	var before := global_position
+	move_and_slide()
+	if _mantle != Mantle.NONE and expected > 0.001 and global_position.distance_to(before) < expected * 0.1:
+		_end_mantle(Vector3.ZERO)
+
+
+func _end_mantle(exit_velocity: Vector3) -> void:
+	_mantle = Mantle.NONE
+	velocity = exit_velocity
 
 
 func _walk_velocity(horizontal: Vector2, has_wish: bool, wish_dir: Vector2, grounded: bool, delta: float) -> Vector2:
@@ -447,6 +538,7 @@ func _publish_snapshot() -> void:
 		global_position.x, global_position.y, global_position.z,
 		velocity.x, velocity.y, velocity.z,
 		yaw, pitch, stance, _slide_elapsed, 1.0 if is_on_floor() else 0.0,
+		_mantle, _mantle_target.x, _mantle_target.y, _mantle_target.z,
 		tick,
 	])
 	assert(snapshot.size() == Snap.SIZE)
@@ -575,8 +667,7 @@ func _reconcile(delta: float) -> void:
 		_synced = true
 		global_position = server_position
 		velocity = server_velocity
-		stance = int(latest[Snap.STANCE]) as Stance
-		_slide_elapsed = latest[Snap.SLIDE]
+		_restore_state(latest)
 		yaw = latest[Snap.YAW]
 		pitch = latest[Snap.PITCH]
 		input.set_look(yaw, pitch)
@@ -588,8 +679,7 @@ func _reconcile(delta: float) -> void:
 	var predicted_end := global_position
 	global_position = server_position
 	velocity = server_velocity
-	stance = int(latest[Snap.STANCE]) as Stance
-	_slide_elapsed = latest[Snap.SLIDE]
+	_restore_state(latest)
 	var current := _frame
 	_replaying = true
 	for entry in _history:
@@ -599,6 +689,14 @@ func _reconcile(delta: float) -> void:
 	_replaying = false
 	_frame = current
 	_error_offset += predicted_end - global_position
+
+
+## Predicting client: the movement state (besides position and velocity) of a snapshot.
+func _restore_state(data: PackedFloat32Array) -> void:
+	stance = int(data[Snap.STANCE]) as Stance
+	_slide_elapsed = data[Snap.SLIDE]
+	_mantle = int(data[Snap.MANTLE]) as Mantle
+	_mantle_target = _snap_vector(data, Snap.TARGET_X)
 
 
 ## Predicting client: the server tick whose state other players are drawn at right
