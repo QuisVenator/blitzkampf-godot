@@ -1,123 +1,134 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://cw6nm7eskjjh2"]
 
-[ext_resource type="Script" path="res://scripts/weapons/weapon_viewmodel.gd" id="1_script"]
-[ext_resource type="PackedScene" path="res://scenes/weapons/shotgun_model.tscn" id="2_gun"]
-[ext_resource type="PackedScene" path="res://assets/models/viewmodel/hands.glb" id="3_hands"]
-[ext_resource type="AnimationLibrary" path="res://scenes/weapons/shotgun_viewmodel_animations.tres" id="4_animations"]
-[ext_resource type="Script" path="res://scripts/weapons/editor_only.gd" id="5_editor_only"]
+[ext_resource type="Script" uid="uid://oxfjk724wbbn" path="res://scripts/weapons/weapon_viewmodel.gd" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://47pmrynmcrse" path="res://scenes/weapons/shotgun_model.tscn" id="2_gun"]
+[ext_resource type="PackedScene" uid="uid://cy2bvhj2gfb0x" path="res://assets/models/viewmodel/hands.glb" id="3_hands"]
+[ext_resource type="AnimationLibrary" uid="uid://ci6qsa5t63y22" path="res://scenes/weapons/shotgun_viewmodel_animations.tres" id="4_animations"]
+[ext_resource type="Script" uid="uid://tkns0urk063d" path="res://scripts/weapons/editor_only.gd" id="5_editor_only"]
 
-[node name="ShotgunViewmodel" type="Node3D" node_paths=PackedStringArray("support_hand")]
+[node name="ShotgunViewmodel" type="Node3D" unique_id=893763615 node_paths=PackedStringArray("support_hand")]
 script = ExtResource("1_script")
 support_hand = NodePath("Rig/Hands/hand_L")
 
-[node name="Rig" type="Node3D" parent="."]
+[node name="Rig" type="Node3D" parent="." unique_id=1831270784]
 
-[node name="Gun" parent="Rig" instance=ExtResource("2_gun")]
+[node name="Gun" parent="Rig" unique_id=888490801 instance=ExtResource("2_gun")]
 
-[node name="Hands" parent="Rig" instance=ExtResource("3_hands")]
+[node name="Hands" parent="Rig" unique_id=558452219 instance=ExtResource("3_hands")]
 
-[node name="hand_R" parent="Rig/Hands" index="1"]
-transform = Transform3D(-4.371139e-08, 1, 0, -1, -4.371139e-08, 0, 0, 0, 1, 0.03, -0.025, 0.07)
+[node name="hand_L" parent="Rig/Hands" index="0" unique_id=1891315724]
+transform = Transform3D(-0.34123307, -0.13372779, -0.9304176, 0.3648768, -0.9310558, 0, -0.86627066, -0.3394878, 0.3665012, -0.079065055, -0.03, -0.5636937)
 
-[node name="index_01_R" parent="Rig/Hands/hand_R" index="2"]
-transform = Transform3D(1, 0, 0, 0, 0.90630776, 0.42261827, 0, -0.42261827, 0.90630776, -0.0375, 0, -0.094)
+[node name="cuff_L" parent="Rig/Hands/hand_L" index="0" unique_id=872341828]
+transform = Transform3D(0.8660254, 0, -0.5, 0, 1, 0, 0.5, 0, 0.8660254, 0, 0, 0)
 
-[node name="index_02_R" parent="Rig/Hands/hand_R/index_01_R" index="2"]
-transform = Transform3D(1, 0, 0, 0, 0.8660254, 0.5, 0, -0.5, 0.8660254, 0, 0, -0.040000007)
+[node name="forearm_L" parent="Rig/Hands/hand_L" index="1" unique_id=1228872328]
+transform = Transform3D(0.49999997, -0.1741386, -0.8483371, 0, 0.9795753, -0.20107792, 0.86602545, 0.100538954, 0.4897876, 0, 0, 0)
 
-[node name="index_03_R" parent="Rig/Hands/hand_R/index_01_R/index_02_R" index="2"]
-transform = Transform3D(1, 0, 0, 0, 0.9396926, 0.34202012, 0, -0.34202012, 0.9396926, 0, 0, -0.025000006)
-
-[node name="middle_01_R" parent="Rig/Hands/hand_R" index="3"]
-transform = Transform3D(1, 0, 0, 0, 0.34202015, 0.9396926, 0, -0.9396926, 0.34202015, -0.0125, 0, -0.094)
-
-[node name="middle_02_R" parent="Rig/Hands/hand_R/middle_01_R" index="2"]
-transform = Transform3D(1, 0, 0, 0, 0.17364822, 0.9848077, 0, -0.9848077, 0.17364822, 0, 0, -0.045)
-
-[node name="middle_03_R" parent="Rig/Hands/hand_R/middle_01_R/middle_02_R" index="2"]
-transform = Transform3D(1, 0, 0, 0, 0.49999997, 0.86602545, 0, -0.86602545, 0.49999997, 0, 0, -0.027999997)
-
-[node name="ring_01_R" parent="Rig/Hands/hand_R" index="6"]
-transform = Transform3D(1, 0, 0, 0, 0.34202015, 0.9396926, 0, -0.9396926, 0.34202015, 0.0125, 0, -0.094)
-
-[node name="ring_02_R" parent="Rig/Hands/hand_R/ring_01_R" index="2"]
-transform = Transform3D(1, 0, 0, 0, 0.17364822, 0.9848077, 0, -0.9848077, 0.17364822, 0, 0, -0.040999994)
-
-[node name="ring_03_R" parent="Rig/Hands/hand_R/ring_01_R/ring_02_R" index="2"]
-transform = Transform3D(1, 0, 0, 0, 0.49999997, 0.86602545, 0, -0.86602545, 0.49999997, 0, 0, -0.025999993)
-
-[node name="pinky_01_R" parent="Rig/Hands/hand_R" index="5"]
-transform = Transform3D(1, 0, 0, 0, 0.34202015, 0.9396926, 0, -0.9396926, 0.34202015, 0.0375, 0, -0.094)
-
-[node name="pinky_02_R" parent="Rig/Hands/hand_R/pinky_01_R" index="2"]
-transform = Transform3D(1, 0, 0, 0, 0.17364822, 0.9848077, 0, -0.9848077, 0.17364822, 0, 0, -0.032000005)
-
-[node name="pinky_03_R" parent="Rig/Hands/hand_R/pinky_01_R/pinky_02_R" index="2"]
-transform = Transform3D(1, 0, 0, 0, 0.49999997, 0.86602545, 0, -0.86602545, 0.49999997, 0, 0, -0.020999998)
-
-[node name="thumb_01_R" parent="Rig/Hands/hand_R" index="7"]
-transform = Transform3D(0.7880108, -0.1069085, 0.6063082, 0, 0.9848077, 0.17364818, -0.6156615, -0.13683663, 0.7760391, -0.036, 0, -0.02)
-
-[node name="thumb_02_R" parent="Rig/Hands/hand_R/thumb_01_R" index="2"]
-transform = Transform3D(1, 0, 0, 0, 0.9396926, 0.34202012, 0, -0.34202012, 0.9396926, 0, 0, -0.033999998)
-
-[node name="thumb_03_R" parent="Rig/Hands/hand_R/thumb_01_R/thumb_02_R" index="2"]
-transform = Transform3D(1, 0, 0, 0, 0.9848077, 0.17364818, 0, -0.17364818, 0.9848077, 0, 0, -0.028)
-
-[node name="hand_L" parent="Rig/Hands" index="0"]
-transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, -0.03, -0.03, -0.25)
-
-[node name="index_01_L" parent="Rig/Hands/hand_L" index="2"]
+[node name="index_01_L" parent="Rig/Hands/hand_L" index="2" unique_id=1025193957]
 transform = Transform3D(1, 0, 0, 0, 0.49999997, 0.86602545, 0, -0.86602545, 0.49999997, 0.0375, 0, -0.094)
 
-[node name="index_02_L" parent="Rig/Hands/hand_L/index_01_L" index="2"]
+[node name="index_02_L" parent="Rig/Hands/hand_L/index_01_L" index="2" unique_id=981943441]
 transform = Transform3D(1, 0, 0, 0, 0.34202015, 0.9396926, 0, -0.9396926, 0.34202015, 0, 0, -0.040000007)
 
-[node name="index_03_L" parent="Rig/Hands/hand_L/index_01_L/index_02_L" index="2"]
+[node name="index_03_L" parent="Rig/Hands/hand_L/index_01_L/index_02_L" index="2" unique_id=1998266059]
 transform = Transform3D(1, 0, 0, 0, 0.64278764, 0.76604444, 0, -0.76604444, 0.64278764, 0, 0, -0.025000006)
 
-[node name="middle_01_L" parent="Rig/Hands/hand_L" index="3"]
+[node name="middle_01_L" parent="Rig/Hands/hand_L" index="3" unique_id=476275344]
 transform = Transform3D(1, 0, 0, 0, 0.34202015, 0.9396926, 0, -0.9396926, 0.34202015, 0.0125, 0, -0.094)
 
-[node name="middle_02_L" parent="Rig/Hands/hand_L/middle_01_L" index="2"]
+[node name="middle_02_L" parent="Rig/Hands/hand_L/middle_01_L" index="2" unique_id=1257208806]
 transform = Transform3D(1, 0, 0, 0, 0.17364822, 0.9848077, 0, -0.9848077, 0.17364822, 0, 0, -0.045)
 
-[node name="middle_03_L" parent="Rig/Hands/hand_L/middle_01_L/middle_02_L" index="2"]
+[node name="middle_03_L" parent="Rig/Hands/hand_L/middle_01_L/middle_02_L" index="2" unique_id=1389581052]
 transform = Transform3D(1, 0, 0, 0, 0.49999997, 0.86602545, 0, -0.86602545, 0.49999997, 0, 0, -0.027999997)
 
-[node name="ring_01_L" parent="Rig/Hands/hand_L" index="6"]
-transform = Transform3D(1, 0, 0, 0, 0.34202015, 0.9396926, 0, -0.9396926, 0.34202015, -0.0125, 0, -0.094)
-
-[node name="ring_02_L" parent="Rig/Hands/hand_L/ring_01_L" index="2"]
-transform = Transform3D(1, 0, 0, 0, 0.17364822, 0.9848077, 0, -0.9848077, 0.17364822, 0, 0, -0.040999994)
-
-[node name="ring_03_L" parent="Rig/Hands/hand_L/ring_01_L/ring_02_L" index="2"]
-transform = Transform3D(1, 0, 0, 0, 0.49999997, 0.86602545, 0, -0.86602545, 0.49999997, 0, 0, -0.025999993)
-
-[node name="pinky_01_L" parent="Rig/Hands/hand_L" index="5"]
+[node name="pinky_01_L" parent="Rig/Hands/hand_L" index="5" unique_id=517787263]
 transform = Transform3D(1, 0, 0, 0, 0.34202015, 0.9396926, 0, -0.9396926, 0.34202015, -0.0375, 0, -0.094)
 
-[node name="pinky_02_L" parent="Rig/Hands/hand_L/pinky_01_L" index="2"]
+[node name="pinky_02_L" parent="Rig/Hands/hand_L/pinky_01_L" index="2" unique_id=295940368]
 transform = Transform3D(1, 0, 0, 0, 0.17364822, 0.9848077, 0, -0.9848077, 0.17364822, 0, 0, -0.032000005)
 
-[node name="pinky_03_L" parent="Rig/Hands/hand_L/pinky_01_L/pinky_02_L" index="2"]
+[node name="pinky_03_L" parent="Rig/Hands/hand_L/pinky_01_L/pinky_02_L" index="2" unique_id=235122833]
 transform = Transform3D(1, 0, 0, 0, 0.49999997, 0.86602545, 0, -0.86602545, 0.49999997, 0, 0, -0.020999998)
 
-[node name="thumb_01_L" parent="Rig/Hands/hand_L" index="7"]
+[node name="ring_01_L" parent="Rig/Hands/hand_L" index="6" unique_id=1970027006]
+transform = Transform3D(1, 0, 0, 0, 0.34202015, 0.9396926, 0, -0.9396926, 0.34202015, -0.0125, 0, -0.094)
+
+[node name="ring_02_L" parent="Rig/Hands/hand_L/ring_01_L" index="2" unique_id=2089561921]
+transform = Transform3D(1, 0, 0, 0, 0.17364822, 0.9848077, 0, -0.9848077, 0.17364822, 0, 0, -0.040999994)
+
+[node name="ring_03_L" parent="Rig/Hands/hand_L/ring_01_L/ring_02_L" index="2" unique_id=24375102]
+transform = Transform3D(1, 0, 0, 0, 0.49999997, 0.86602545, 0, -0.86602545, 0.49999997, 0, 0, -0.025999993)
+
+[node name="thumb_01_L" parent="Rig/Hands/hand_L" index="7" unique_id=71988619]
 transform = Transform3D(0.7880108, 0, -0.6156615, 0, 1, 0, 0.6156615, 0, 0.7880108, 0.036, 0, -0.02)
 
-[node name="thumb_02_L" parent="Rig/Hands/hand_L/thumb_01_L" index="2"]
+[node name="thumb_02_L" parent="Rig/Hands/hand_L/thumb_01_L" index="2" unique_id=7828146]
 transform = Transform3D(1, 0, 0, 0, 0.9848077, 0.17364818, 0, -0.17364818, 0.9848077, 0, 0, -0.033999998)
 
-[node name="thumb_03_L" parent="Rig/Hands/hand_L/thumb_01_L/thumb_02_L" index="2"]
+[node name="thumb_03_L" parent="Rig/Hands/hand_L/thumb_01_L/thumb_02_L" index="2" unique_id=1402770023]
 transform = Transform3D(1, 0, 0, 0, 0.9848077, 0.17364818, 0, -0.17364818, 0.9848077, 0, 0, -0.028)
 
-[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
-libraries = {&"": ExtResource("4_animations")}
+[node name="hand_R" parent="Rig/Hands" index="1" unique_id=1524430133]
+transform = Transform3D(0.05602258, 0.9961946, 0.06676516, -0.76604444, -3.3484863e-08, 0.6427875, 0.6403416, -0.0871557, 0.7631293, 0.042099908, -0.010585442, -0.017695926)
 
-[node name="PreviewCamera" type="Camera3D" parent="."]
+[node name="cuff_R" parent="Rig/Hands/hand_R" index="0" unique_id=1727954948]
+transform = Transform3D(0.9396926, 0, 0.34202012, 0, 1, 0, -0.34202012, 0, 0.9396926, 0, 0, 0)
+
+[node name="forearm_R" parent="Rig/Hands/hand_R" index="1" unique_id=763329496]
+transform = Transform3D(0.76604444, 0, 0.6427876, 0, 1, 0, -0.6427876, 0, 0.76604444, 0, 0, 0)
+
+[node name="index_01_R" parent="Rig/Hands/hand_R" index="2" unique_id=1764240116]
+transform = Transform3D(1, 0, 0, 0, 0.90630776, 0.42261827, 0, -0.42261827, 0.90630776, -0.0375, 0, -0.094)
+
+[node name="index_02_R" parent="Rig/Hands/hand_R/index_01_R" index="2" unique_id=906007077]
+transform = Transform3D(1, 0, 0, 0, 0.8660254, 0.5, 0, -0.5, 0.8660254, 0, 0, -0.040000007)
+
+[node name="index_03_R" parent="Rig/Hands/hand_R/index_01_R/index_02_R" index="2" unique_id=1031183306]
+transform = Transform3D(1, 0, 0, 0, 0.9396926, 0.34202012, 0, -0.34202012, 0.9396926, 0, 0, -0.025000006)
+
+[node name="middle_01_R" parent="Rig/Hands/hand_R" index="3" unique_id=221065301]
+transform = Transform3D(1, 0, 0, 0, 0.34202015, 0.9396926, 0, -0.9396926, 0.34202015, -0.0125, 0, -0.094)
+
+[node name="middle_02_R" parent="Rig/Hands/hand_R/middle_01_R" index="2" unique_id=1815331137]
+transform = Transform3D(1, 0, 0, 0, 0.17364822, 0.9848077, 0, -0.9848077, 0.17364822, 0, 0, -0.045)
+
+[node name="middle_03_R" parent="Rig/Hands/hand_R/middle_01_R/middle_02_R" index="2" unique_id=1138831053]
+transform = Transform3D(1, 0, 0, 0, 0.49999997, 0.86602545, 0, -0.86602545, 0.49999997, 0, 0, -0.027999997)
+
+[node name="pinky_01_R" parent="Rig/Hands/hand_R" index="5" unique_id=1942748825]
+transform = Transform3D(1, 0, 0, 0, 0.34202015, 0.9396926, 0, -0.9396926, 0.34202015, 0.0375, 0, -0.094)
+
+[node name="pinky_02_R" parent="Rig/Hands/hand_R/pinky_01_R" index="2" unique_id=331383672]
+transform = Transform3D(1, 0, 0, 0, 0.17364822, 0.9848077, 0, -0.9848077, 0.17364822, 0, 0, -0.032000005)
+
+[node name="pinky_03_R" parent="Rig/Hands/hand_R/pinky_01_R/pinky_02_R" index="2" unique_id=1157365486]
+transform = Transform3D(1, 0, 0, 0, 0.49999997, 0.86602545, 0, -0.86602545, 0.49999997, 0, 0, -0.020999998)
+
+[node name="ring_01_R" parent="Rig/Hands/hand_R" index="6" unique_id=228284122]
+transform = Transform3D(1, 0, 0, 0, 0.34202015, 0.9396926, 0, -0.9396926, 0.34202015, 0.0125, 0, -0.094)
+
+[node name="ring_02_R" parent="Rig/Hands/hand_R/ring_01_R" index="2" unique_id=794291398]
+transform = Transform3D(1, 0, 0, 0, 0.17364822, 0.9848077, 0, -0.9848077, 0.17364822, 0, 0, -0.040999994)
+
+[node name="ring_03_R" parent="Rig/Hands/hand_R/ring_01_R/ring_02_R" index="2" unique_id=1147441492]
+transform = Transform3D(1, 0, 0, 0, 0.49999997, 0.86602545, 0, -0.86602545, 0.49999997, 0, 0, -0.025999993)
+
+[node name="thumb_01_R" parent="Rig/Hands/hand_R" index="7" unique_id=807711374]
+transform = Transform3D(0.7880108, -0.1069085, 0.6063082, 0, 0.9848077, 0.17364818, -0.6156615, -0.13683663, 0.7760391, -0.036, 0, -0.02)
+
+[node name="thumb_02_R" parent="Rig/Hands/hand_R/thumb_01_R" index="2" unique_id=392598846]
+transform = Transform3D(1, 0, 0, 0, 0.9396926, 0.34202012, 0, -0.34202012, 0.9396926, 0, 0, -0.033999998)
+
+[node name="thumb_03_R" parent="Rig/Hands/hand_R/thumb_01_R/thumb_02_R" index="2" unique_id=1068995988]
+transform = Transform3D(1, 0, 0, 0, 0.9848077, 0.17364818, 0, -0.17364818, 0.9848077, 0, 0, -0.028)
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=1080172988]
+libraries/ = ExtResource("4_animations")
+
+[node name="PreviewCamera" type="Camera3D" parent="." unique_id=102301893]
 transform = Transform3D(0.9980267, 0, -0.062790565, 0, 1, 0, 0.062790565, 0, 0.9980267, -0.24593791, 0.26, 0.4053573)
 script = ExtResource("5_editor_only")
-near = 0.05
 
 [editable path="Rig/Hands"]

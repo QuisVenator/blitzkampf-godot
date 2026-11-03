@@ -9,9 +9,15 @@ extends SubViewportContainer
 ## Visual layer (a bit value) of everything that belongs to the viewmodel.
 const LAYER := 2
 
+## Lights are culled by the camera's mask like meshes are, so `bind` adds the viewmodel layer
+## to the world's directional lights. On top of that come the view-locked `KeyLight` (a soft
+## fill, layer 2) and a reduced share of the world's flat ambient light.
+@export var ambient_energy := 0.45
+
 var world_camera: Camera3D
 
 @onready var camera: Camera3D = $SubViewport/Camera
+@onready var key_light: DirectionalLight3D = $SubViewport/Camera/KeyLight
 @onready var primary_holder: Node3D = $SubViewport/Camera/WeaponHolder
 @onready var secondary_holder: Node3D = $SubViewport/Camera/WeaponHolderLeft
 
@@ -19,12 +25,18 @@ var world_camera: Camera3D
 func _ready() -> void:
 	# Runs after the player has placed its camera for this frame.
 	process_priority = 100
+	# From above, left and in front of the viewer.
+	key_light.rotation_degrees = Vector3(-50, -35, 0)
 
 
 ## `world` is the player's normal camera.
 func bind(world: Camera3D) -> void:
 	world_camera = world
 	world.cull_mask &= ~LAYER
+	# The world's suns light the viewmodel too (the world camera still sees them on layer 1).
+	for light in world.get_tree().root.find_children("*", "DirectionalLight3D", true, false):
+		if light != key_light:
+			(light as DirectionalLight3D).layers |= LAYER
 
 
 func _process(_delta: float) -> void:
@@ -43,6 +55,7 @@ func _copy_environment() -> void:
 		return
 	var copy := world_environment.duplicate() as Environment
 	copy.background_mode = Environment.BG_CLEAR_COLOR
+	copy.ambient_light_energy = ambient_energy
 	camera.environment = copy
 
 
